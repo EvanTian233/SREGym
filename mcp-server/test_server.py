@@ -39,3 +39,7 @@ def summarize_example_text(text: str) -> list[base.Message]:
         base.UserMessage("Please summarize this text"),
         base.UserMessage(text),
     ]
+
+
+if __name__ == "__main__":
+    mcp.run()
