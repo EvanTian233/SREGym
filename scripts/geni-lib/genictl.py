@@ -13,6 +13,13 @@ from prompt_toolkit.enums import EditingMode
 import warnings
 warnings.filterwarnings("ignore")
 
+def validate_hours(value):
+    """Validate that hours is a positive float value."""
+    float_value = float(value)
+    if float_value <= 0:
+        raise argparse.ArgumentTypeError("Hours must be greater than 0")
+    return float_value
+
 def create_slice(context, args):
     """Create a new slice with the given name."""
     try:
@@ -85,15 +92,18 @@ def list_slices(context, args):
             print(json.dumps(res, indent=2))
         else:
             for k, v in res.items():
-                if (
-                    datetime.datetime.strptime(v["SLICE_EXPIRATION"], "%Y-%m-%dT%H:%M:%SZ")
-                    > datetime.datetime.now()
-                ):
-                    print(f"SLICE_NAME: {v['SLICE_NAME']}")
-                    print(f"SLICE_DESCRIPTION: {v['SLICE_DESCRIPTION']}")
-                    print(f"SLICE_CREATION: {v['SLICE_CREATION']}")
-                    print(f"SLICE_EXPIRATION: {v['SLICE_EXPIRATION']}")
-                    print(f"SLICE_PROJECT_URN: {v['SLICE_PROJECT_URN']}\n")
+                try:
+                    if (
+                        datetime.datetime.strptime(v["SLICE_EXPIRATION"], "%Y-%m-%dT%H:%M:%SZ")
+                        > datetime.datetime.now()
+                    ):
+                        print(f"SLICE_NAME: {v['SLICE_NAME']}")
+                        print(f"SLICE_DESCRIPTION: {v['SLICE_DESCRIPTION']}")
+                        print(f"SLICE_CREATION: {v['SLICE_CREATION']}")
+                        print(f"SLICE_EXPIRATION: {v['SLICE_EXPIRATION']}")
+                        print(f"SLICE_PROJECT_URN: {v['SLICE_PROJECT_URN']}\n")
+                except Exception as e:
+                   pass
     except Exception as e:
         print(f"Error: {e}")
 
@@ -188,7 +198,7 @@ def main():
     # Create Slice
     create_slice_parser = subparsers.add_parser('create-slice', help='Create a new slice')
     create_slice_parser.add_argument('slice_name', help='Name of the slice')
-    create_slice_parser.add_argument('--hours', type=int, default=1, help='Hours until expiration')
+    create_slice_parser.add_argument('--hours', type=validate_hours, default=1, help='Hours until expiration')
     create_slice_parser.add_argument('--description', default='CloudLab experiment', help='Slice description')
 
     # Create Sliver
@@ -205,12 +215,12 @@ def main():
     # Renew Slice
     renew_slice_parser = subparsers.add_parser('renew-slice', help='Renew a slice')
     renew_slice_parser.add_argument('slice_name', help='Name of the slice')
-    renew_slice_parser.add_argument('--hours', type=int, default=1, help='Hours to extend')
+    renew_slice_parser.add_argument('--hours', type=validate_hours, default=1, help='Hours to extend')
 
     # Renew Sliver
     renew_sliver_parser = subparsers.add_parser('renew-sliver', help='Renew a sliver')
     renew_sliver_parser.add_argument('slice_name', help='Name of the slice')
-    renew_sliver_parser.add_argument('--hours', type=int, default=1, help='Hours to extend')
+    renew_sliver_parser.add_argument('--hours', type=validate_hours, default=1, help='Hours to extend')
     renew_sliver_parser.add_argument('--site', choices=['utah', 'clemson', 'wisconsin'], default='utah', help='CloudLab site')
 
     # List Slices
