@@ -130,7 +130,7 @@ async def main():
     agent.display_welcome_message()
     await agent.set_problem()
 
-    await orchestrator.start_problem(max_steps=30)
+    await orchestrator.start_problem()
 
 
 if __name__ == "__main__":

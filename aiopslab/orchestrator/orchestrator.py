@@ -88,9 +88,12 @@ class Orchestrator:
         solution = parsed["args"][0] if parsed["args"] else None
         duration = time.time() - self.execution_start_time
 
+        # === Evaluate based on current stage ===
         if self.submission_stage == "detection":
             results = self.problem.detection_oracle.evaluate(solution)
             self.results["Detection"] = results
+            if results["Detection Accuracy"] == "Invalid Format":
+                return "[⚠️] Invalid detection format. Please try again."
             self.submission_stage = (
                 "localization" if results.get("success") else "mitigation"
             )
@@ -99,6 +102,17 @@ class Orchestrator:
         elif self.submission_stage == "localization":
             results = self.problem.localization_oracle.evaluate(solution)
             self.results["Localization"] = results
+            if (
+                "Localization Accuracy" not in results
+                or results.get("Localization Accuracy") == 0.0
+                and not results.get("is_subset", False)
+            ):
+                if not isinstance(solution, (str, list)):
+                    return "[⚠️] Invalid localization format. Please try again."
+                if isinstance(solution, list) and not all(
+                    isinstance(x, str) for x in solution
+                ):
+                    return "[⚠️] Invalid localization list contents. Please try again."
             self.submission_stage = "mitigation"
             return SubmissionStatus.VALID_SUBMISSION
 
@@ -109,9 +123,9 @@ class Orchestrator:
             return SubmissionStatus.VALID_SUBMISSION
 
         elif self.submission_stage == "done":
-            return "[⚠️] Problem already completed."
+            return "[✅] Problem completed."
 
-    async def start_problem(self, max_steps: int = 50):
+    async def start_problem(self):
         instr = "Please take the next action"
         try:
             while self.submission_stage != "done":

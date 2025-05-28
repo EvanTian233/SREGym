@@ -125,7 +125,7 @@ if __name__ == "__main__":
             problem_desc, instructs, apis = orchestrator.init_problem(pid)
             agent.init_context(problem_desc, instructs, apis)
 
-            full_output = asyncio.run(orchestrator.start_problem(max_steps=30))
+            full_output = asyncio.run(orchestrator.start_problem())
             results = full_output.get("results", {})
 
             filename = f"react_{pid}.json"

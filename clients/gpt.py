@@ -18,8 +18,6 @@ from parse_result import DOCS_SHELL_ONLY
 from aiopslab.orchestrator import Orchestrator
 from aiopslab.orchestrator.problems.registry import ProblemRegistry
 from clients.utils.llm import GPTClient
-from dotenv import load_dotenv
-
 from clients.utils.templates import DOCS_SHELL_ONLY
 
 # Load environment variables from the .env file
@@ -129,7 +127,7 @@ if __name__ == "__main__":
 
         problem_desc, instructs, apis = orchestrator.init_problem(pid)
         agent.init_context(problem_desc, instructs, apis)
-        asyncio.run(orchestrator.start_problem(max_steps=30))
+        asyncio.run(orchestrator.start_problem())
 
     if use_wandb:
         # Finish the wandb run

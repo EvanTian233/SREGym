@@ -174,7 +174,7 @@ AIOpsLab makes it extremely easy to develop and evaluate your agents. You can on
 
         ```python
         import asyncio
-        asyncio.run(orch.start_problem(max_steps=30))
+        asyncio.run(orch.start_problem())
         ```
 
 This process will create a [`Session`](/aiopslab/session.py) with the orchestrator, where the agent will solve the problem. The orchestrator will evaluate your agent's solution and provide results (stored under `data/results/`). You can use these to improve your agent.
