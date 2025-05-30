@@ -2,15 +2,15 @@
 
 <h1>SREArena</h1>
 
-[🤖Overview](#🤖overview) | 
+<!-- [🤖Overview](#🤖overview) |  -->
 [🚀Quick Start](#🚀quickstart) | 
 [📦Installation](#📦installation) | 
 [⚙️Usage](#⚙️usage) | 
 [📂Project Structure](#📂project-structure) |
-[📄How to Cite](#📄how-to-cite)
+<!-- [📄How to Cite](#📄how-to-cite) -->
 
-[![ArXiv Link](https://img.shields.io/badge/arXiv-2501.06706-red?logo=arxiv)](https://arxiv.org/pdf/2501.06706)
-[![ArXiv Link](https://img.shields.io/badge/arXiv-2407.12165-red?logo=arxiv)](https://arxiv.org/pdf/2407.12165)
+<!-- [![ArXiv Link](https://img.shields.io/badge/arXiv-2501.06706-red?logo=arxiv)](https://arxiv.org/pdf/2501.06706)
+[![ArXiv Link](https://img.shields.io/badge/arXiv-2407.12165-red?logo=arxiv)](https://arxiv.org/pdf/2407.12165) -->
 </div>
 
 
@@ -392,7 +392,7 @@ See a full example of a problem [here](/srearena/conductor/problems/k8s_target_p
 <summary><code>cli.py</code>: A command line interface to interact with SREArena, e.g., used by human operators.</summary>
 
 
-<h2 id="📄how-to-cite">📄 How to Cite</h2>
+<!-- <h2 id="📄how-to-cite">📄 How to Cite</h2>
 
 ```bibtex
 @misc{chen2024aiopslab,
@@ -407,20 +407,9 @@ See a full example of a problem [here](/srearena/conductor/problems/k8s_target_p
   year = {2024},
   booktitle = {Proceedings of 15th ACM Symposium on Cloud Computing},
 }
-```
+``` -->
 
-## Code of Conduct
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 
 ## License
-
-Copyright (c) Microsoft Corporation. All rights reserved.
-
 Licensed under the [MIT](LICENSE.txt) license.
-
-
-### Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow [Microsoft’s Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks). Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or logos is subject to those third-party’s policies.
