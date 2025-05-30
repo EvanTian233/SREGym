@@ -8,7 +8,7 @@ import litellm
 from dotenv import load_dotenv
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -49,22 +49,44 @@ class LiteLLMBackend:
         litellm.drop_params = True
 
     def inference(
-        self, system_prompt: str, input: str, tools: Optional[list[any]] = None
-    ) -> (str, str):
-        logger.info(f"NL input received: {input}")
+        self,
+        system_prompt: str,
+        messages: str | list[dict[str, str]],
+        tools: Optional[list[any]] = None,
+    ):
+        if isinstance(messages, str):
+            logger.debug(f"NL input as str received: {messages}")
+            messages = []
 
-        messages = []
-
-        if self.thinking_tools == "wx":
-            messages = [
-                {"role": "control", "content": "thinking"},
-                {"role": "user", "content": system_prompt + "\n" + input},
-            ]
-        else:
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": input},
-            ]
+            if self.thinking_tools == "wx":
+                messages = [
+                    {"role": "control", "content": "thinking"},
+                    {"role": "user", "content": system_prompt + "\n" + input},
+                ]
+            else:
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": input},
+                ]
+        if isinstance(messages, list):
+            logger.debug(f"NL input as list received: {messages}")
+            if messages[0].get("role") is None:
+                logger.debug("No system message provided.")
+                system_message = {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                }
+                if system_prompt is None:
+                    logger.warning(
+                        "No system prompt provided. Using default system prompt."
+                    )
+                else:
+                    logger.debug("Using system prompt provided.")
+                    system_message["content"] = system_prompt
+                logger.debug(
+                    f"inserting [{system_message}] at the beginning of messages"
+                )
+                messages.insert(0, system_message)
 
         kwargs = {
             "model": f"{self.provider}/{self.model_name}",
