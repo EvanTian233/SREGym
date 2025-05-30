@@ -32,6 +32,7 @@ except KeyError:
 
 try:
     API_KEY_TOOLS = os.environ["API_KEY_TOOLS"]
+    os.environ["OPENAI_API_KEY"] = API_KEY_TOOLS
 except KeyError:
     print("Unable to find environment variable - API_KEY_TOOLS.")
     raise
