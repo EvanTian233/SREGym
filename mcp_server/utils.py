@@ -6,9 +6,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", 120))
@@ -17,32 +15,28 @@ RETRY_BACKOFF_FACTOR = float(os.getenv("RETRY_BACKOFF_FACTOR", 0.3))
 
 
 class ObservabilityClient:
-    grafana_url: Optional[str] = None
-    grafana_service_account_token: Optional[str] = None
+    jaeger_url: Optional[str] = None
+    jaeger_service_account_token: Optional[str] = None
     headers: Optional[Dict] = None
     session: Optional[Any] = None
 
-    def __init__(self, grafana_url: Optional[str] = None):
-        self.grafana_url = os.environ.get("OBSERVABILITY_STACK_URL", None)
-        if self.grafana_url is None:
-            if grafana_url is not None:
-                self.grafana_url = grafana_url
+    def __init__(self, jaeger_url: Optional[str] = None):
+        self.jaeger_url = os.environ.get("OBSERVABILITY_STACK_URL", None)
+        if self.jaeger_url is None:
+            if jaeger_url is not None:
+                self.jaeger_url = jaeger_url
             else:
-                self.grafana_url = "http://localhost:8000"
+                self.jaeger_url = "http://localhost:8000"
 
-        self.grafana_service_account_token = os.environ.get(
-            "GRAFANA_SERVICE_ACCOUNT_TOKEN", "NOP"
-        )
+        logger.info(f"jaeger url: {self.jaeger_url}")
 
-        logger.debug(
-            "url: {g}, token: {t}".format(
-                g=self.grafana_url, t=self.grafana_service_account_token
-            )
-        )
+        self.jaeger_service_account_token = os.environ.get("GRAFANA_SERVICE_ACCOUNT_TOKEN", "NOP")
+
+        logger.debug("url: {g}, token: {t}".format(g=self.jaeger_url, t=self.jaeger_service_account_token))
 
         self.headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.grafana_service_account_token}",
+            "Authorization": f"Bearer {self.jaeger_service_account_token}",
         }
         self.session = self.create_retrying_session()
 
@@ -61,9 +55,7 @@ class ObservabilityClient:
 
     def make_request(self, method: str, url: str, **kwargs) -> requests.Response:
         try:
-            response = self.session.request(
-                method, url, headers=self.headers, timeout=REQUEST_TIMEOUT, **kwargs
-            )
+            response = self.session.request(method, url, headers=self.headers, timeout=REQUEST_TIMEOUT, **kwargs)
             response.raise_for_status()
             return response
         except requests.Timeout:
