@@ -3,6 +3,7 @@ import json
 import logging
 from typing import Annotated
 
+from azure.mgmt.core.exceptions import TypedErrorInfo
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langgraph.constants import END
@@ -27,11 +28,26 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
+# FIXME: when having multiple tools, this logic should add the corresponding
+#   ctx to tools
+mcp_ctx_manager = MCPClientCtxManager(
+    {"observability": "../../mcp_server/observability_server.py"}
+)
+session = asyncio.run(mcp_ctx_manager.connect_to_servers())
+
 llm = get_llm_backend_for_tools()
+get_traces = GetTraces(session)
+get_services = GetServices(session)
+get_operations = GetOperations(session)
+tools = [
+    get_traces,
+    get_services,
+    get_operations,
+]
 
 
 def agent(state: State):
-    return {"messages": [llm.inference(messages=state["messages"])]}
+    return {"messages": [llm.inference(messages=state["messages"], tools=tools)]}
 
 
 def route_tools(state: State):
@@ -39,6 +55,7 @@ def route_tools(state: State):
     Use in the conditional_edge to route to the ToolNode if the last message
     has tool calls. Otherwise, route to the end.
     """
+    logger.info(f"route_tools: {state}")
     if isinstance(state, list):
         ai_message = state[-1]
     elif messages := state.get("messages", []):
@@ -46,27 +63,14 @@ def route_tools(state: State):
     else:
         raise ValueError(f"No messages found in input state to tool_edge: {state}")
     if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
+        logger.info("invoking tool node: observability_tool_node")
         return "observability_tool_node"
+    logger.info("invoking node: end")
     return END
 
 
 graph_builder = StateGraph(State)
 graph_builder.add_node("agent", agent)
-
-tools = [
-    get_traces,
-    get_services,
-    get_operations,
-]
-
-mcp_ctx_manager = MCPClientCtxManager(
-    {"observability": "../../mcp_server/observability_server.py"}
-)
-try:
-    asyncio.run(mcp_ctx_manager.connect_to_servers())
-except Exception as e:
-    logger.error(f"Error connecting to MCP servers: {e}")
-    exit(1)
 
 
 class BasicToolNode:
@@ -80,20 +84,16 @@ class BasicToolNode:
             message = messages[-1]
         else:
             raise ValueError("No message found in input")
+        logger.info(f"BasicToolNode: {message}")
         outputs = []
         for tool_call in message.tool_calls:
             # choosing the right ctx by tools called
             # assuming we have different mcp servers for different tools
-            match tool_call["name"]:
-                case "get_traces" | "get_services" | "get_operations":
-                    session = mcp_ctx_manager.ctx_selector("observability")
-                    # TODO: this should pass the correct ctx to the langchain tool
-                    tool_result = self.tools_by_name[tool_call["name"]].invoke(
-                        [session] + tool_call["args"]
-                    )
-                case _:
-                    tool_result = {"error": "Tool not found"}
-                    logger.warning(f"Tool {tool_call['name']} not found")
+            logger.info(f"invoking tool: {tool_call["name"]}, tool_call: {tool_call}")
+            tool_result = asyncio.run(
+                self.tools_by_name[tool_call["name"]].ainvoke(tool_call["args"])
+            )
+            logger.info(f"tool_result: {tool_result}")
             outputs.append(
                 ToolMessage(
                     content=json.dumps(tool_result),
@@ -125,8 +125,12 @@ graph = graph_builder.compile()
 
 def stream_graph_updates(user_input: str):
     for event in graph.stream({"messages": [{"role": "user", "content": user_input}]}):
+        logger.info(event)
         for value in event.values():
-            logger.info("Assistant:", value["messages"][-1].content)
+            try:
+                logger.info("Assistant: %s", value["messages"][-1].content)
+            except TypeError as e:
+                logger.info(f"Error: {e}")
 
 
 while True:

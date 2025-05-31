@@ -23,7 +23,7 @@ class MCPClientCtxManager:
     def __init__(self, server_paths: dict[str, str]):
         # Initialize session and client objects
         self.sessions: dict[str, ClientSession] = dict()
-        self.exit_stack = AsyncExitStack()
+        self.exit_stacks: dict[str, AsyncExitStack] = dict()
         self.server_paths = server_paths
 
     async def connect_to_servers(self):
@@ -34,6 +34,7 @@ class MCPClientCtxManager:
         """
         # TODO: how to connect to remotely hosted mcp server?
         for server_name, server_path in self.server_paths.items():
+            self.exit_stacks[server_name] = AsyncExitStack()
             is_python = server_path.endswith(".py")
             is_js = server_path.endswith(".js")
             if not (is_python or is_js):
@@ -49,12 +50,12 @@ class MCPClientCtxManager:
             )
 
             logging.info(f"Starting server: {server_name} with params: {server_params}")
-
-            stdio_transport = await self.exit_stack.enter_async_context(
+            stdio_transport = await self.exit_stacks[server_name].enter_async_context(
                 stdio_client(server_params)
             )
+
             stdio, write = stdio_transport
-            session = await self.exit_stack.enter_async_context(
+            session = await self.exit_stacks[server_name].enter_async_context(
                 ClientSession(stdio, write)
             )
 
@@ -66,8 +67,10 @@ class MCPClientCtxManager:
             response = await session.list_tools()
             tools = response.tools
             logger.info(
-                "Connected to server with tools: %s", [tool.name for tool in tools]
+                "Connected to server with tools, %s", [tool.name for tool in tools]
             )
+
+            # await self.exit_stacks[server_name].aclose()
 
     def ctx_selector(self, server_name: str):
         """Selects the right session to use for the tool"""
