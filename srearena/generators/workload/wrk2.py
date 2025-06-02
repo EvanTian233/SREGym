@@ -306,7 +306,9 @@ class Wrk2WorkloadManager(StreamWorkloadManager):
         return grouped_logs
 
     def start(self):
+        print("== Start Workload ==")
         self.create_task()
 
     def stop(self):
+        print("== Stop Workload ==")
         self.wrk.stop_workload(job_name=self.job_name)

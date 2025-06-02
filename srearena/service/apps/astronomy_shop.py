@@ -2,6 +2,7 @@
 
 import time
 
+from srearena.generators.workload.astronomy_shop import AstronomyShopWorkloadManager
 from srearena.paths import ASTRONOMY_SHOP_METADATA
 from srearena.service.apps.base import Application
 from srearena.service.helm import Helm
@@ -40,6 +41,18 @@ class AstronomyShop(Application):
     def cleanup(self):
         Helm.uninstall(**self.helm_configs)
         self.kubectl.delete_namespace(self.helm_configs["namespace"])
+
+        self.wrk.stop()
+
+    def create_workload(self):
+        self.wrk = AstronomyShopWorkloadManager(
+            deployment_name="load-generator",
+        )
+
+    def start_workload(self):
+        if not hasattr(self, "wrk"):
+            self.create_workload()
+        self.wrk.start()
 
 
 # Run this code to test installation/deletion
