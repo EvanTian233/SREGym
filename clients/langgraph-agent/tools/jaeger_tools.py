@@ -13,7 +13,7 @@ from mcp import ClientSession, StdioServerParameters, stdio_client
 from mcp.client.sse import sse_client
 from pydantic import BaseModel, Field
 
-USE_HTTP = True
+USE_HTTP = False
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 class GetTracesInput(BaseModel):
     service: str = Field(description="service name")
-    operation: str = Field(description="operation name")
     last_n_minutes: int = Field(description="last n minutes of traces")
 
 
@@ -33,7 +32,6 @@ class GetTraces(BaseTool):
     def _run(
         self,
         service: str,
-        operation: str,
         last_n_minutes: int,
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
@@ -43,13 +41,10 @@ class GetTraces(BaseTool):
     async def _arun(
         self,
         service: str,
-        operation: str,
         last_n_minutes: int,
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
-        logger.info(
-            f"calling mcp get_traces from langchain get_traces, with service {service} and operation {operation}"
-        )
+        logger.info(f"calling mcp get_traces from langchain get_traces, with service {service}")
         exit_stack = AsyncExitStack()
         server_name = "observability"
         if USE_HTTP:
@@ -86,7 +81,6 @@ class GetTraces(BaseTool):
             "get_traces",
             arguments={
                 "service": service,
-                "operation": operation,
                 "last_n_minutes": last_n_minutes,
             },
         )
