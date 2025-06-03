@@ -246,6 +246,90 @@ def setup_kind_cluster(cfg: dict) -> None:
     subprocess.run(["kind", "create", "cluster", "--config", kind_cfg], check=True)
     print("Kind cluster ready ")
 
+def deploy_srearena(ex: RemoteExecutor, deploy_key_path: str) -> None:
+    """Deploy SREArena with proper SSH key handling and host verification"""
+    print("Setting up SREArena deployment…")
+    
+    # Read the private key content from local file
+    try:
+        with open(deploy_key_path, 'r') as f:
+            private_key_content = f.read()
+    except FileNotFoundError:
+        raise RuntimeError(f"Deploy key not found: {deploy_key_path}")
+    
+    # Create the private key on the remote server
+    setup_cmds = [
+        "mkdir -p ~/.ssh",
+        "chmod 700 ~/.ssh",
+        # Write the private key to remote server
+        f"cat > ~/.ssh/srearena_deploy << 'EOF'\n{private_key_content}\nEOF",
+        "chmod 600 ~/.ssh/srearena_deploy",
+        # Add GitHub to known_hosts to avoid host key verification
+        "ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true",
+    ]
+    
+    for cmd in setup_cmds:
+        print(f"      Setting up SSH: {cmd[:50]}...")
+        rc, stdout, stderr = ex.exec(cmd)
+        if rc != 0:
+            print(f"      Setup failed: {stderr.strip()}")
+            raise RuntimeError(f"SSH setup failed: {stderr.strip()}")
+    
+    # Clone and deploy SREArena
+    deploy_cmds = [
+        # Use the correct repository URL
+        "ssh-agent bash -c 'ssh-add ~/.ssh/srearena_deploy; git clone git@github.com:xlab-uiuc/SREArena.git /tmp/srearena'",
+        "cd /tmp/srearena",
+        # Clean up the private key for security
+        "rm -f ~/.ssh/srearena_deploy"
+    ]
+    
+    for cmd in deploy_cmds:
+        print(f"      Running: {cmd[:60]}...")
+        rc, stdout, stderr = ex.exec(cmd)
+        if rc != 0:
+            print(f"      Failed command: {cmd}")
+            print(f"      Error: {stderr.strip()}")
+            raise RuntimeError(f"[{ex.host}] `{cmd}` failed:\n{stderr.strip()}")
+    
+    print("✅ SREArena deployed successfully!")
+
+def setup_cloudlab_cluster_with_srearena(cfg: dict, deploy_key: str) -> None:
+    cloud, cidr = cfg["cloudlab"], cfg["pod_network_cidr"]
+    executors: list[RemoteExecutor] = []
+    try:
+        for host in cloud["nodes"]:
+            print(f"Installing K8s components on {host} …")
+            ex = RemoteExecutor(host, cloud["ssh_user"], cloud.get("ssh_key"))
+            install_k8s_components(ex)
+            executors.append(ex)
+
+        print("\nInitializing control plane…")
+        join_cmd = init_master(executors[0], cidr)
+        print("✓ Control plane is Ready!")
+
+        if len(executors) > 1:
+            print(f"\nJoining {len(executors)-1} workers…")
+            for ex in executors[1:]:
+                join_worker(ex, join_cmd)
+
+        # Deploy SREArena
+        print("\nDeploying SREArena…")
+        deploy_srearena(executors[0], deploy_key)
+
+        # Health check
+        print("\nPerforming cluster health check…")
+        time.sleep(10)
+        rc, nodes_out, _ = executors[0].exec("kubectl get nodes --no-headers")
+        if rc == 0:
+            print("\n🟢 Cluster is up:")
+            print(nodes_out)
+        else:
+            print("⚠️  Unable to list nodes — check manually.")
+    finally:
+        for ex in executors:
+            ex.close()
+
 def main() -> None:
     cfg = load_cfg()
     try:

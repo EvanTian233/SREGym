@@ -52,6 +52,10 @@ p_q.add_argument("--k8s", action="store_true",
                  help="bootstrap Kubernetes after sliver is ready")
 p_q.add_argument("--pod-network-cidr", default="192.168.0.0/16",
                  help="Calico pod CIDR (default 192.168.0.0/16)")
+p_q.add_argument("--deploy-srearena", action="store_true",
+                 help="deploy SREArena after K8s cluster is ready")
+p_q.add_argument("--deploy-key", 
+                 help="path to SSH deploy key for SREArena private repo")
 
 
 # ╭──────────────────────────────────────────────────────────────────────────╮
@@ -223,6 +227,8 @@ def quick_experiment(a: argparse.Namespace) -> None:
             "nodes":    hosts,
         },
         "pod_network_cidr": a.pod_network_cidr,
+        "deploy_srearena": a.deploy_srearena,
+        "deploy_key": a.deploy_key,
     }
 
     print("⌛  Waiting (≤20 min) for SSH on all nodes …")
@@ -252,13 +258,25 @@ def quick_experiment(a: argparse.Namespace) -> None:
 
     print("🚀  Running cluster_setup …")
     try:
-        setup_cloudlab_cluster(cfg)
+        if a.deploy_srearena:
+            from cluster_setup import setup_cloudlab_cluster_with_srearena
+            setup_cloudlab_cluster_with_srearena(cfg, a.deploy_key)
+
+        else:
+            setup_cloudlab_cluster(cfg)
         print("✅  Kubernetes cluster ready!")
     except Exception as e:
         print(f"❌  Cluster setup failed: {e}")
         print("    Nodes are reachable but Kubernetes setup encountered an error.")
 
 
+# def get_srearena_setup():
+#     try:
+#         # from srearena_deployment import setup_cloudlab_cluster_with_srearena
+#         return setup_cloudlab_cluster_with_srearena
+#     except ImportError as e:
+#         print(f"⚠️  SREArena deployment not available: {e}")
+#         return None
 # ╭──────────────────────────────────────────────────────────────────────────╮
 # │  Main dispatcher                                                         │
 # ╰──────────────────────────────────────────────────────────────────────────╯
