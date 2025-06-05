@@ -20,7 +20,7 @@ class SSHManager:
         private_key_path: Optional[str] = None,
         port: int = 22,
         timeout: int = DefaultSettings.DEFAULT_SSH_TIME_OUT_SECONDS,
-        max_retries: int = 3,
+        max_retries: int = 10,
         retry_delay: int = 2,  # seconds
     ):
         self.hostname = hostname
