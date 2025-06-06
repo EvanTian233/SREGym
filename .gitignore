@@ -373,3 +373,7 @@ context.json
 
 # Ignore sqlite3 database
 *.sqlite3
+
+# Ignore provisioner ssh keys
+provisioner_ssh_key
+provisioner_ssh_key.pub

@@ -45,11 +45,17 @@ The SSL certificate remains in the original `cloudlab.pem` file.
 
 ### Environment Variables
 
+The provisioner needs its own set of ssh keys. Generate ssh keys for the provisioner using the following command:
+
+```bash
+ssh-keygen -t ed25519 -f provisioner_ssh_key
+```
+
 Set the following required environment variables:
 
 ```bash
-export PROVISIONER_SSH_PRIVATE_KEY_PATH="/path/to/provisioner_ssh_private_key"
-export PROVISIONER_SSH_PUBLIC_KEY_PATH="/path/to/provisioner_ssh_public_key"
+export PROVISIONER_SSH_PRIVATE_KEY_PATH="/path/to/provisioner_ssh_key"
+export PROVISIONER_SSH_PUBLIC_KEY_PATH="/path/to/provisioner_ssh_key.pub"
 
 export CLOUDLAB_CERT_PATH="/path/to/cloudlab.pem"
 export CLOUDLAB_KEY_PATH="/path/to/cloudlab_decrypted.pem"
