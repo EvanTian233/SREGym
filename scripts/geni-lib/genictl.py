@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""
-GENI / CloudLab experiment management CLI - Fixed Version
-"""
-# ──────────────────────────────────────────────────────────────────────────────
-# 0. make repo root importable
-# ──────────────────────────────────────────────────────────────────────────────
+
 import sys
 from pathlib import Path
 import warnings
@@ -13,9 +8,6 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 1. stdlib + third-party
-# ──────────────────────────────────────────────────────────────────────────────
 import argparse
 import datetime
 import json
@@ -31,7 +23,7 @@ from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.key_binding import KeyBindings
 
-from provisioner.utils.parser import parse_sliver_info, collect_and_parse_hardware_info
+from provisioner.utils.parser import collect_and_parse_hardware_info, parse_sliver_info
 
 warnings.filterwarnings("ignore")
 
@@ -61,9 +53,7 @@ def create_slice(context, args):
     try:
         print(f"Creating slice '{args.slice_name}'...")
         expiration = datetime.datetime.now() + datetime.timedelta(hours=args.hours)
-        res = context.cf.createSlice(
-            context, args.slice_name, exp=expiration, desc=args.description
-        )
+        res = context.cf.createSlice(context, args.slice_name, exp=expiration, desc=args.description)
         print(f"Slice Info: \n{json.dumps(res, indent=2)}")
         print(f"Slice '{args.slice_name}' created")
     except Exception as e:
@@ -179,9 +169,7 @@ def get_aggregate(site):
 def get_hardware_info(context=None, args=None):
     hardware_info_list = collect_and_parse_hardware_info()
     if hardware_info_list:
-        print(
-            f"\n{'Hardware Name':<20} | {'Cluster Name':<30} | {'Total':<7} | {'Free':<7}"
-        )
+        print(f"\n{'Hardware Name':<20} | {'Cluster Name':<30} | {'Total':<7} | {'Free':<7}")
         print("-" * 100)
 
         for item in hardware_info_list:
@@ -196,14 +184,9 @@ def get_hardware_info(context=None, args=None):
 # Kubernetes bootstrapper
 from cluster_setup import setup_cloudlab_cluster
 
-
-# ╭──────────────────────────────────────────────────────────────────────────╮
-# │  CLI configuration                                                      │
-# ╰──────────────────────────────────────────────────────────────────────────╯
 parser = argparse.ArgumentParser("genictl", description="GENI / CloudLab CLI")
 sub = parser.add_subparsers(dest="cmd", required=True)
 
-# quick-experiment ------------------------------------------------------------
 p_q = sub.add_parser("quick-experiment", help="slice + sliver quickly")
 p_q.add_argument("--site", choices=["utah", "clemson", "wisconsin"],
                  default="wisconsin")
@@ -225,9 +208,6 @@ p_q.add_argument("--deploy-key",
                  help="path to SSH deploy key for SREArena private repo")
 
 
-# ╭──────────────────────────────────────────────────────────────────────────╮
-# │  quick-experiment implementation                                        │
-# ╰──────────────────────────────────────────────────────────────────────────╯
 def _host_list_from_logininfo(logininfo) -> list[str]:
     """
     Extract hostnames from GENI login info.
@@ -436,17 +416,6 @@ def quick_experiment(a: argparse.Namespace) -> None:
         print(f"❌  Cluster setup failed: {e}")
         print("    Nodes are reachable but Kubernetes setup encountered an error.")
 
-
-# def get_srearena_setup():
-#     try:
-#         # from srearena_deployment import setup_cloudlab_cluster_with_srearena
-#         return setup_cloudlab_cluster_with_srearena
-#     except ImportError as e:
-#         print(f"⚠️  SREArena deployment not available: {e}")
-#         return None
-# ╭──────────────────────────────────────────────────────────────────────────╮
-# │  Main dispatcher                                                         │
-# ╰──────────────────────────────────────────────────────────────────────────╯
 def main() -> None:
     args = parser.parse_args()
     match args.cmd:
