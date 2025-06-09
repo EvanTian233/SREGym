@@ -26,6 +26,9 @@ class CompoundedOracle(Oracle):
                 res = oracle.evaluate(*args, **kwargs)
                 res["name"] = key
                 result["oracles"].append(res)
+
+                if not res.get("success", False):
+                    result["success"] = False
             except Exception as e:
                 print(f"[❌] Error during evaluation of oracle '{key}': {e}")
                 result["success"] = False
