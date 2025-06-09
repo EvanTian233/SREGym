@@ -8,7 +8,7 @@ from windowed_file import FileNotOpened, WindowedFile  # type: ignore
 from clients.langgraph_agent.k8s_agent import State
 
 
-def open_file(path: Optional[str] = None, line_number: Optional[str] = None) -> None:
+def open_file(state: State, path: Optional[str] = None, line_number: Optional[str] = None) -> None:
     # This tool should get both path and line number from the state
     # if the state does not have them, then it means no file has been opened yet.
     if path is None:
@@ -38,10 +38,3 @@ def open_file(path: Optional[str] = None, line_number: Optional[str] = None) -> 
 
     wf.goto(line_num - 1, mode="top")
     wf.print_window()
-
-
-def main(state: Optional[State] = None, path: Optional[str] = None, line_number: Optional[str] = None) -> None:
-    # langgraph tools should only invoke the tool, not manage langgraph states.
-    if state is not None:
-        raise ValueError("State is None. Have you passed in the state object?")
-    open_file(path, line_number)
