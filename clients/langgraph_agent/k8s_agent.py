@@ -12,6 +12,7 @@ from langgraph.prebuilt import ToolNode
 from llm_backend.init_backend import get_llm_backend_for_tools
 from tools.basic_tool_node import BasicToolNode
 from tools.jaeger_tools import *
+from tools.text_editing.open import open_file
 from typing_extensions import TypedDict
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -40,11 +41,12 @@ class XAgent:
         get_traces = GetTraces()
         get_services = GetServices()
         get_operations = GetOperations()
-        self.tools = [
+        self.observability_tools = [
             get_traces,
             get_services,
             get_operations,
         ]
+        self.file_editing_tools = [open_file]
         self.llm = llm
 
     def route_tools(self, state: State):
@@ -60,24 +62,22 @@ class XAgent:
         else:
             raise ValueError(f"No messages found in input state to tool_edge: {state}")
         if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-            # FIXME: THIS BREAKS THE AGENT???
-            logger.info("ai_message is calling tool: %s", ai_message.tool_calls[0]["name"])
             tool_name = ai_message.tool_calls[0]["name"]
-            logger.info("tool name: %s", tool_name)
-            match tool_name:
-                case "get_traces" | "get_services" | "get_operations":
-                    logger.info("invoking node: observability_tool_node")
-                    return "observability_tool_node"
-                case "open_file":
-                    logger.info("invoking node: file_editing_tool_node")
-                    return "file_editing_tool_node"
-                case _:
-                    logger.info("not invoking tool, returning end")
-                    return END
+            logger.info(f"invoking tool: {tool_name}")
+            logger.info("invoking tool node: file tool")
+            return "file_editing_tool_node"
+        logger.info("invoking node: end")
+        return END
 
     # this is the agent node. it simply queries the llm and return the results
     def llm_inference_step(self, state: State):
-        return {"messages": [self.llm.inference(messages=state["messages"], tools=self.tools)]}
+        return {
+            "messages": [
+                self.llm.inference(
+                    messages=state["messages"], tools=[*self.observability_tools, *self.file_editing_tools]
+                )
+            ]
+        }
 
     def build_agent(self):
         # we add the node to the graph
@@ -86,10 +86,12 @@ class XAgent:
         # we also have a tool node. this tool node connects to a jaeger MCP server
         # and allows you to query any jaeger information
 
-        observability_tool_node = BasicToolNode(self.tools, is_async=True)
+        observability_tool_node = BasicToolNode(self.observability_tools, is_async=True)
+        file_editing_tool_node = ToolNode(self.file_editing_tools)
 
         # we add the node to the graph
-        self.graph_builder.add_node("observability_tool_node", observability_tool_node)
+        # self.graph_builder.add_node("observability_tool_node", observability_tool_node)
+        self.graph_builder.add_node("file_editing_tool_node", file_editing_tool_node)
 
         # after creating the nodes, we now add the edges
         # the start of the graph is denoted by the keyword START, end is END.
@@ -113,12 +115,17 @@ class XAgent:
             # want to use a node named something else apart from "tools",
             # You can update the value of the dictionary to something else
             # e.g., "tools": "my_tools"
-            {"observability_tool_node": "observability_tool_node", END: END},
+            {
+                # "observability_tool_node": "observability_tool_node",
+                "file_editing_tool_node": "file_editing_tool_node",
+                END: END,
+            },
         )
         # interestingly, for short-term memory (i.e., agent trajectories or conversation history), we need
         # to explicitly implement it.
         # here, it is implemented as a in-memory checkpointer.
-        self.graph_builder.add_edge("observability_tool_node", "agent")
+        # self.graph_builder.add_edge("observability_tool_node", "agent")
+        self.graph_builder.add_edge("file_editing_tool_node", "agent")
         memory = MemorySaver()
         self.graph = self.graph_builder.compile(checkpointer=memory)
 
