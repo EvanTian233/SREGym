@@ -63,10 +63,16 @@ class XAgent:
             raise ValueError(f"No messages found in input state to tool_edge: {state}")
         if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
             tool_name = ai_message.tool_calls[0]["name"]
-            logger.info(f"invoking tool: {tool_name}")
-            logger.info("invoking tool node: file tool")
-            return "file_editing_tool_node"
-        logger.info("invoking node: end")
+            if tool_name == "open_file":
+                logger.info("invoking tool node: file tool")
+                return "file_editing_tool_node"
+            elif tool_name in ["get_traces", "get_services", "get_operations"]:
+                logger.info("invoking tool node: observability tool")
+                return "observability_tool_node"
+            else:
+                logger.info("invoking tool node: end")
+                return END
+        logger.info("no tool call, returning END")
         return END
 
     # this is the agent node. it simply queries the llm and return the results
@@ -90,7 +96,7 @@ class XAgent:
         file_editing_tool_node = ToolNode(self.file_editing_tools)
 
         # we add the node to the graph
-        # self.graph_builder.add_node("observability_tool_node", observability_tool_node)
+        self.graph_builder.add_node("observability_tool_node", observability_tool_node)
         self.graph_builder.add_node("file_editing_tool_node", file_editing_tool_node)
 
         # after creating the nodes, we now add the edges
@@ -116,7 +122,7 @@ class XAgent:
             # You can update the value of the dictionary to something else
             # e.g., "tools": "my_tools"
             {
-                # "observability_tool_node": "observability_tool_node",
+                "observability_tool_node": "observability_tool_node",
                 "file_editing_tool_node": "file_editing_tool_node",
                 END: END,
             },
@@ -124,7 +130,7 @@ class XAgent:
         # interestingly, for short-term memory (i.e., agent trajectories or conversation history), we need
         # to explicitly implement it.
         # here, it is implemented as a in-memory checkpointer.
-        # self.graph_builder.add_edge("observability_tool_node", "agent")
+        self.graph_builder.add_edge("observability_tool_node", "agent")
         self.graph_builder.add_edge("file_editing_tool_node", "agent")
         memory = MemorySaver()
         self.graph = self.graph_builder.compile(checkpointer=memory)
