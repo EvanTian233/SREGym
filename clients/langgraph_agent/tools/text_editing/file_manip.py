@@ -50,7 +50,7 @@ def update_file_vars_in_state(
     return new_state
 
 
-@tool("open_file", description="open a file")
+@tool("open_file", description="open a file, path: <absolute path to file>, line_number: <line_number>")
 def open_file(
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = "",
