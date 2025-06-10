@@ -74,8 +74,12 @@ class XAgent:
 
     # this is the agent node. it simply queries the llm and return the results
     def llm_inference_step(self, state: State):
-        logger.info("invoking llm inference, custom state: %s", state["curr_file"])
-        return {"messages": [self.llm.inference(messages=state["messages"], tools=self.all_tools)]}
+        logger.info("invoking llm inference, custom state: %s", state)
+        return {
+            "messages": [self.llm.inference(messages=state["messages"], tools=self.all_tools)],
+            "curr_file": state["curr_file"],
+            "curr_line": state["curr_line"],
+        }
 
     def build_agent(self):
         # we add the node to the graph
@@ -131,8 +135,9 @@ class XAgent:
         if not self.graph:
             raise ValueError("Agent graph is None. Have you built the agent?")
         config = {"configurable": {"thread_id": "1"}}
+        logger.info(f"memory list: {self.graph.checkpointer.list(config)}")
         for event in self.graph.stream(
-            {"messages": [{"role": "user", "content": user_input}]},
+            {"messages": [{"role": "user", "content": user_input}], "curr_file": "", "curr_line": 0},
             config=config,
             stream_mode="values",
         ):
