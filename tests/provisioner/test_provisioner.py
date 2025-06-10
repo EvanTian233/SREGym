@@ -183,7 +183,7 @@ def cleanup_cloudlab_clusters(state_manager: StateManager):
 # 6. test_claimed_cluster_inactivity_timeout - Tests cleanup of inactive claimed clusters
 # 7. test_eval_override_for_inactivity - Tests evaluation mode claimed cluster protection
 # 8. test_claimed_cluster_extension - Tests automatic claimed cluster reservation extension
-# 9. test_srearena_deploy - Tests SRE Arena deployment
+# 9. test_srearena_deploy - Tests SRE Arena deployment.
 #
 
 
@@ -577,7 +577,7 @@ def test_srearena_deploy(state_manager):
     """
     Tests that SRE Arena is deployed on a claimed cluster.
     """
-    logger.info("Running Test: SRE Arena Deployment when claiming a direct-provisioned cluster")
+    logger.info("Running Test: SRE Arena Deployment when claiming a cluster")
 
     # 1. Register a user and claim a cluster
     stdout, stderr, exit_code = run_cli_command(
