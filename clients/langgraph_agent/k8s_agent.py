@@ -49,6 +49,10 @@ class XAgent:
         self.file_editing_tools = [open_file]
         self.llm = llm
 
+    @property
+    def all_tools(self):
+        return [*self.observability_tools, *self.file_editing_tools]
+
     def route_tools(self, state: State):
         """
         Use in the conditional_edge to route to the ToolNode if the last message
@@ -63,27 +67,22 @@ class XAgent:
             raise ValueError(f"No messages found in input state to tool_edge: {state}")
         if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
             tool_name = ai_message.tool_calls[0]["name"]
-            if tool_name == "open_file":
-                logger.info("invoking tool node: file tool")
-                return "file_editing_tool_node"
-            elif tool_name in ["get_traces", "get_services", "get_operations"]:
-                logger.info("invoking tool node: observability tool")
-                return "observability_tool_node"
-            else:
-                logger.info("invoking tool node: end")
-                return END
+            match tool_name:
+                case "open_file":
+                    logger.info("invoking tool node: file tool")
+                    return "file_editing_tool_node"
+                case "get_traces" | "get_services" | "get_operations":
+                    logger.info("invoking tool node: observability tool")
+                    return "observability_tool_node"
+                case _:
+                    logger.info("invoking tool node: end")
+                    return END
         logger.info("no tool call, returning END")
         return END
 
     # this is the agent node. it simply queries the llm and return the results
     def llm_inference_step(self, state: State):
-        return {
-            "messages": [
-                self.llm.inference(
-                    messages=state["messages"], tools=[*self.observability_tools, *self.file_editing_tools]
-                )
-            ]
-        }
+        return {"messages": [self.llm.inference(messages=state["messages"], tools=self.all_tools)]}
 
     def build_agent(self):
         # we add the node to the graph
