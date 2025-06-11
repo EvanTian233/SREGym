@@ -2,7 +2,7 @@
 def mark_fault_injected(method):
     def wrapper(self, *args, **kwargs):
         result = method(self, *args, **kwargs)
-        self.is_fault_injected = method.__name__ == "inject_fault"
+        self.fault_injected = method.__name__ == "inject_fault"
         return result
 
     return wrapper
