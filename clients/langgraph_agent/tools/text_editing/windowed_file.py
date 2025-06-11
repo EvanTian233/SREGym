@@ -8,6 +8,37 @@ class FileNotOpened(Exception):
     """Raised when no file is opened."""
 
 
+class TextNotFound(Exception):
+    """Raised when the text is not found in the window."""
+
+
+def _find_all(a_str: str, sub: str):
+    start = 0
+    while True:
+        start = a_str.find(sub, start)
+        if start == -1:
+            return
+        yield start
+        start += len(sub)
+
+
+class ReplacementInfo:
+    def __init__(self, first_replaced_line: int, n_search_lines: int, n_replace_lines: int, n_replacements: int):
+        self.first_replaced_line = first_replaced_line
+        self.n_search_lines = n_search_lines
+        self.n_replace_lines = n_replace_lines
+        self.n_replacements = n_replacements
+
+    def __repr__(self):
+        return f"ReplacementInfo(first_replaced_line={self.first_replaced_line}, n_search_lines={self.n_search_lines}, n_replace_lines={self.n_replace_lines}, n_replacements={self.n_replacements})"
+
+
+class InsertInfo:
+    def __init__(self, first_inserted_line: int, n_lines_added: int):
+        self.first_inserted_line = first_inserted_line
+        self.n_lines_added = n_lines_added
+
+
 class WindowedFile:
     def __init__(
         self,
@@ -70,6 +101,131 @@ class WindowedFile:
         self.offset_multiplier = 1 / 6
         self._original_text = self.text
         self._original_first_line = self.first_line
+
+    def set_window_text(self, new_text: str, *, line_range: Optional[Tuple[int, int]] = None) -> None:
+        """Replace the text in the current display window with a new string."""
+        text = self.text.split("\n")
+        if line_range is not None:
+            start, stop = line_range
+        else:
+            start, stop = self.line_range
+
+        # Handle empty replacement text (deletion case)
+        new_lines = new_text.split("\n") if new_text else []
+        text[start : stop + 1] = new_lines
+        self.text = "\n".join(text)
+
+    def insert(self, text: str, line: Optional[int] = None, *, reset_first_line: str = "top") -> "InsertInfo":
+        # Standardize empty text handling
+        if not text:
+            return InsertInfo(first_inserted_line=(self.n_lines if line is None else line), n_lines_added=0)
+
+        # Remove single trailing newline if it exists
+        text = text[:-1] if text.endswith("\n") else text
+
+        if line is None:
+            # Append to end of file
+            if not self.text:
+                new_text = text
+            else:
+                current_text = self.text[:-1] if self.text.endswith("\n") else self.text
+                new_text = current_text + "\n" + text
+            insert_line = self.n_lines
+        elif line < 0:
+            # Insert at start of file
+            if not self.text:
+                new_text = text
+            else:
+                current_text = self.text[1:] if self.text.startswith("\n") else self.text
+                new_text = text + "\n" + current_text
+            insert_line = 0
+        else:
+            # Insert at specific line
+            lines = self.text.split("\n")
+            lines.insert(line, text)
+            new_text = "\n".join(lines)
+            insert_line = line
+
+        self.text = new_text
+        if reset_first_line != "keep":
+            self.goto(insert_line, mode=reset_first_line)
+
+        return InsertInfo(first_inserted_line=insert_line, n_lines_added=len(text.split("\n")))
+
+    def replace_in_window(
+        self,
+        search: str,
+        replace: str,
+        *,
+        reset_first_line: str = "top",
+    ) -> "ReplacementInfo":
+        """Search and replace in the window.
+
+        Args:
+            search: The string to search for (can be multi-line).
+            replace: The string to replace it with (can be multi-line).
+            reset_first_line: If "keep", we keep the current line. Otherwise, we
+                `goto` the line where the replacement started with this mode.
+        """
+        window_text = self.get_window_text()
+        # Update line number
+        index = window_text.find(search)
+        if index == -1:
+            if self._exit_on_exception:
+                print(f"Error: Text not found: {search}")
+                exit(1)
+            raise TextNotFound
+        window_start_line, _ = self.line_range
+        replace_start_line = window_start_line + len(window_text[:index].split("\n")) - 1
+        new_window_text = window_text.replace(search, replace)
+        self.set_window_text(new_window_text)
+        if reset_first_line == "keep":
+            pass
+        else:
+            self.goto(replace_start_line, mode=reset_first_line)
+        return ReplacementInfo(
+            first_replaced_line=replace_start_line,
+            n_search_lines=len(search.split("\n")),
+            n_replace_lines=len(replace.split("\n")),
+            n_replacements=1,
+        )
+
+    def replace(self, search: str, replace: str, *, reset_first_line: str = "top") -> "ReplacementInfo":
+        indices = list(_find_all(self.text, search))
+        if not indices:
+            if self._exit_on_exception:
+                print(f"Error: Text not found: {search}")
+                exit(1)
+            raise TextNotFound
+        replace_start_line = len(self.text[: indices[0]].split("\n"))
+        new_text = self.text.replace(search, replace)
+        self.text = new_text
+        if reset_first_line == "keep":
+            pass
+        else:
+            self.goto(replace_start_line, mode=reset_first_line)
+        return ReplacementInfo(
+            first_replaced_line=replace_start_line,
+            n_search_lines=len(search.split("\n")),
+            n_replace_lines=len(replace.split("\n")),
+            n_replacements=len(indices),
+        )
+
+    def find_all_occurrences(self, search: str, zero_based: bool = True) -> List[int]:
+        """Returns the line numbers of all occurrences of the search string."""
+        indices = list(_find_all(self.text, search))
+        line_numbers = []
+        for index in indices:
+            line_no = len(self.text[:index].split("\n"))
+            if zero_based:
+                line_numbers.append(line_no - 1)
+            else:
+                line_numbers.append(line_no)
+        return line_numbers
+
+    def undo_edit(self):
+        self.text = self._original_text
+        self.first_line = self._original_first_line
 
     @property
     def first_line(self) -> int:
