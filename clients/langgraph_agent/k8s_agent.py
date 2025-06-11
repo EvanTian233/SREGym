@@ -140,11 +140,22 @@ class XAgent:
                 except TypeError as e:
                     pass
 
+    def save_agent_graph_to_png(self):
+        from IPython.display import Image
+
+        try:
+            with open("./agent_graph.png", "wb") as png:
+                png.write(self.graph.get_graph().draw_mermaid_png())
+        except Exception:
+            # This requires some extra dependencies and is optional
+            pass
+
 
 if __name__ == "__main__":
     llm = get_llm_backend_for_tools()
     xagent = XAgent(llm)
     xagent.build_agent()
+    xagent.save_agent_graph_to_png()
     # a short chatbot loop to demonstrate the workflow.
     # TODO: make a real file-editing agent to test both state & memory mgmt and file editing tools
     while True:
