@@ -6,7 +6,6 @@ from typing import Annotated
 from langchain_core.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-from numba.scripts.generate_lower_listing import description
 
 from clients.langgraph_agent.tools.text_editing.file_manip import update_file_vars_in_state
 
@@ -93,7 +92,7 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 @tool("edit")
-def main(
+def edit(
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = "",
     search: str = "",
