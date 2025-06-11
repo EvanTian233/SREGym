@@ -144,12 +144,8 @@ class XAgent:
     def save_agent_graph_to_png(self):
         from IPython.display import Image
 
-        try:
-            with open("./agent_graph.png", "wb") as png:
-                png.write(self.graph.get_graph().draw_mermaid_png())
-        except Exception:
-            # This requires some extra dependencies and is optional
-            pass
+        with open("./agent_graph.png", "wb") as png:
+            png.write(self.graph.get_graph().draw_mermaid_png())
 
 
 if __name__ == "__main__":
