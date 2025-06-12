@@ -118,6 +118,55 @@ class KubeCtl:
 
             raise Exception(f"[red]Timeout: Namespace '{namespace}' was not deleted within {max_wait} seconds.")
 
+    def is_ready(self, pod):
+        phase = pod.status.phase or ""
+        container_statuses = pod.status.container_statuses or []
+        conditions = pod.status.conditions or []
+
+        if phase in ["Succeeded", "Failed"]:
+            return True
+
+        if phase == "Running":
+            if all(cs.ready for cs in container_statuses):
+                return True
+
+        for cs in container_statuses:
+            if cs.state and cs.state.waiting:
+                reason = cs.state.waiting.reason
+                if reason == "CrashLoopBackOff":
+                    return True
+
+        if phase == "Pending":
+            for cond in conditions:
+                if cond.type == "PodScheduled" and cond.status == "False":
+                    return True
+
+        return False
+
+    def wait_for_stable(self, namespace: str, sleep: int = 2, max_wait: int = 300):
+        console = Console()
+        console.log(f"[bold yellow]Waiting for namespace '{namespace}' to be stable...")
+
+        with console.status("[bold yellow]Waiting for pods to be stable...") as status:
+            wait = 0
+
+            while wait < max_wait:
+                try:
+                    pod_list = self.list_pods(namespace)
+
+                    if pod_list.items:
+
+                        if all(self.is_ready(pod) for pod in pod_list.items):
+                            console.log(f"[bold green]All pods in namespace '{namespace}' are stable.")
+                            return
+                except Exception as e:
+                    console.log(f"[red]Error checking pod statuses: {e}")
+
+                time.sleep(sleep)
+                wait += sleep
+
+            raise Exception(f"[red]Timeout: Namespace '{namespace}' was not deleted within {max_wait} seconds.")
+
     def update_deployment(self, name: str, namespace: str, deployment):
         """Update the deployment configuration."""
         return self.apps_v1_api.replace_namespaced_deployment(name, namespace, deployment)
@@ -260,6 +309,56 @@ class KubeCtl:
         except ApiException as e:
             print(f"Exception when retrieving node architectures: {e}\n")
         return architectures
+
+    def get_node_memory_capacity(self):
+        max_capacity = 0
+        try:
+            nodes = self.core_v1_api.list_node()
+            for node in nodes.items:
+                capacity = node.status.capacity.get("memory")
+                capacity = self.parse_k8s_quantity(capacity) if capacity else 0
+                max_capacity = max(max_capacity, capacity)
+            return max_capacity
+        except ApiException as e:
+            print(f"Exception when retrieving node memory capacity: {e}\n")
+            return {}
+
+    def parse_k8s_quantity(self, mem_str):
+        mem_str = mem_str.strip()
+        unit_multipliers = {
+            "Ki": 1,
+            "Mi": 1024**1,
+            "Gi": 1024**2,
+            "Ti": 1024**3,
+            "Pi": 1024**4,
+            "Ei": 1024**5,
+            "K": 1,
+            "M": 1000**1,
+            "G": 1000**2,
+            "T": 1000**3,
+            "P": 1000**4,
+            "E": 1000**5,
+        }
+
+        import re
+
+        match = re.match(r"^([0-9.]+)([a-zA-Z]+)?$", mem_str)
+        if not match:
+            raise ValueError(f"Invalid Kubernetes quantity: {mem_str}")
+
+        number, unit = match.groups()
+        number = float(number)
+        multiplier = unit_multipliers.get(unit, 1)  # default to 1 if no unit
+        return int(number * multiplier)
+
+    def format_k8s_memory(self, bytes_value):
+        units = ["Ki", "Mi", "Gi", "Ti", "Pi", "Ei"]
+        value = bytes_value
+        for unit in units:
+            if value < 1024:
+                return f"{round(value, 2)}{unit}"
+            value /= 1024
+        return f"{round(value, 2)}Ei"
 
 
 # Example usage:

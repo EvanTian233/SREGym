@@ -18,6 +18,7 @@ class WorkloadOracle(Oracle):
 
     def evaluate(self) -> dict:
         try:
+            self.wrk.collect(number=1)
             entries = self.wrk.collect(number=50)
             for entry in entries:
                 if not entry.ok:
