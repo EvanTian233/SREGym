@@ -3,6 +3,7 @@ import atexit
 import inspect
 import os
 import time
+from json.decoder import JSONDecodeError
 
 from srearena.conductor.parser import ResponseParser
 from srearena.conductor.problems.registry import ProblemRegistry
@@ -12,7 +13,6 @@ from srearena.utils.critical_section import CriticalSection
 from srearena.utils.sigint_aware_section import SigintAwareSection
 from srearena.utils.status import SessionPrint, SubmissionStatus
 
-from json.decoder import JSONDecodeError
 
 class Conductor:
     def __init__(self):
@@ -86,9 +86,9 @@ class Conductor:
 
                 self.problem.app.delete()
                 self.problem.app.deploy()
-        except (KeyboardInterrupt):
-            print("\nCTRL+C detected while setting up resources. Immediately terminating and cleaning up resources...")
-            atexit.register(self.exit_cleanup_and_recover_fault)
+        except KeyboardInterrupt:
+            print("\nImmediately terminating and Cleaning up...")
+            self.exit_cleanup_and_recover_fault()
             raise SystemExit from None
 
         with CriticalSection():
@@ -205,7 +205,7 @@ class Conductor:
             "results": {
                 "faulty": faulty_results,
                 "noop": noop_results,
-            } 
+            }
         }
 
     def exit_cleanup_and_recover_fault(self):
@@ -213,23 +213,22 @@ class Conductor:
             print("Recovering fault before exit...")
             try:
                 self.problem.recover_fault()
-            except (JSONDecodeError):
+            except JSONDecodeError:
                 # CTRL+C before service is set up results in a JSONDecodeError
                 print("Service has not been set up. Skipping fault recovery.")
-            except (RuntimeError):
+            except RuntimeError:
                 # When waiting for namespace deletion, console.status() is called and results in a RuntimeError
                 pass
-            
-            self.problem.app.cleanup()
 
+            self.problem.app.cleanup()
 
         self.prometheus.teardown()
 
         self.kubectl.exec_command("kubectl delete sc openebs-hostpath openebs-device --ignore-not-found")
         self.kubectl.exec_command("kubectl delete -f https://openebs.github.io/charts/openebs-operator.yaml")
-        self.kubectl.wait_for_namespace_deletion("openebs")
-        
+
         print("\nCleanup complete!")
+
 
 def exit_cleanup_fault(conductor):
     conductor.exit_cleanup_and_recover_fault()
