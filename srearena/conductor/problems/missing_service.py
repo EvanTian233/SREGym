@@ -1,5 +1,4 @@
 from srearena.conductor.oracles.compound import CompoundedOracle
-from srearena.conductor.oracles.detection import DetectionOracle
 from srearena.conductor.oracles.localization import LocalizationOracle
 from srearena.conductor.oracles.mitigation import MitigationOracle
 from srearena.conductor.oracles.workload import WorkloadOracle
@@ -9,6 +8,7 @@ from srearena.service.apps.astronomy_shop import AstronomyShop
 from srearena.service.apps.hotelres import HotelReservation
 from srearena.service.apps.socialnet import SocialNetwork
 from srearena.service.kubectl import KubeCtl
+from srearena.utils.decorators import mark_fault_injected
 
 
 class MissingService(Problem):
@@ -27,7 +27,6 @@ class MissingService(Problem):
 
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
-        self.detection_oracle = DetectionOracle(problem=self, expected="Yes")
         self.localization_oracle = LocalizationOracle(problem=self, expected=[self.faulty_service])
         self.app.create_workload()
         self.mitigation_oracle = CompoundedOracle(
@@ -36,6 +35,7 @@ class MissingService(Problem):
             WorkloadOracle(problem=self, wrk_manager=self.app.wrk),
         )
 
+    @mark_fault_injected
     def inject_fault(self):
         print("== Fault Injection ==")
         injector = VirtualizationFaultInjector(namespace=self.namespace)
@@ -45,6 +45,7 @@ class MissingService(Problem):
         )
         print(f"Service: {self.faulty_service} | Namespace: {self.namespace}\n")
 
+    @mark_fault_injected
     def recover_fault(self):
         print("== Fault Recovery ==")
         injector = VirtualizationFaultInjector(namespace=self.namespace)
