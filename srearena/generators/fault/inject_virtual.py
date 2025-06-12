@@ -221,6 +221,57 @@ class VirtualizationFaultInjector(FaultInjector):
 
             print(f"Recovered from wrong binary usage fault for service: {service}")
 
+    # V.7 - Inject a fault by deleting the specified service
+    def inject_missing_service(self, microservices: list[str]):
+        """Inject a fault by deleting the specified service."""
+        for service in microservices:
+            service_yaml_file = self._get_service_yaml(service)
+            delete_service_command = f"kubectl delete service {service} -n {self.namespace}"
+            result = self.kubectl.exec_command(delete_service_command)
+            print(f"Deleted service {service} to enforce the fault: {result}")
+
+            self._write_yaml_to_file(service, service_yaml_file)
+
+        # Restart all the pods
+        self.kubectl.exec_command(f"kubectl delete pods --all -n {self.namespace}")
+        self.kubectl.wait_for_stable(namespace=self.namespace)
+
+    def recover_missing_service(self, microservices: list[str]):
+        """Recover the fault by recreating the specified service."""
+        for service in microservices:
+            delete_service_command = f"kubectl delete service {service} -n {self.namespace}"
+            result = self.kubectl.exec_command(delete_service_command)
+            create_service_command = f"kubectl apply -f /tmp/{service}_modified.yaml -n {self.namespace}"
+            result = self.kubectl.exec_command(create_service_command)
+            print(f"Recreated service {service} to recover from the fault: {result}")
+
+    # V.8 - Inject a fault by modifying the resource request of a service
+    def inject_resource_request(self, microservices: list[str], memory_limit_func):
+        """Inject a fault by modifying the resource request of a service."""
+        for service in microservices:
+            original_deployment_yaml = self._get_deployment_yaml(service)
+            deployment_yaml = memory_limit_func(original_deployment_yaml)
+            modified_yaml_path = self._write_yaml_to_file(service, deployment_yaml)
+
+            # Delete the deployment and re-apply
+            delete_command = f"kubectl delete deployment {service} -n {self.namespace}"
+            apply_command = f"kubectl apply -f {modified_yaml_path} -n {self.namespace}"
+            self.kubectl.exec_command(delete_command)
+            self.kubectl.exec_command(apply_command)
+
+            self._write_yaml_to_file(service, original_deployment_yaml)
+
+    def recover_resource_request(self, microservices: list[str]):
+        """Recover the fault by restoring the original resource request of a service."""
+        for service in microservices:
+            # Delete the deployment and re-apply
+            delete_command = f"kubectl delete deployment {service} -n {self.namespace}"
+            apply_command = f"kubectl apply -f /tmp/{service}_modified.yaml -n {self.namespace}"
+            self.kubectl.exec_command(delete_command)
+            self.kubectl.exec_command(apply_command)
+
+            print(f"Recovered from resource request fault for service: {service}")
+
     ############# HELPER FUNCTIONS ################
     def _wait_for_pods_ready(self, microservices: list[str], timeout: int = 30):
         for service in microservices:
@@ -267,6 +318,10 @@ class VirtualizationFaultInjector(FaultInjector):
         deployment_yaml = self.kubectl.exec_command(
             f"kubectl get deployment {service_name} -n {self.namespace} -o yaml"
         )
+        return yaml.safe_load(deployment_yaml)
+
+    def _get_service_yaml(self, service_name: str):
+        deployment_yaml = self.kubectl.exec_command(f"kubectl get service {service_name} -n {self.namespace} -o yaml")
         return yaml.safe_load(deployment_yaml)
 
     def _change_node_selector(self, deployment_yaml: dict, node_name: str):

@@ -80,7 +80,7 @@ class HotelReservation(Application):
         print(f"Deploying Kubernetes configurations in namespace: {self.namespace}")
         self.kubectl.apply_configs(self.namespace, self.k8s_deploy_path)
         print(f"Waiting for stability...")
-        time.sleep(30)
+        self.kubectl.wait_for_stable(namespace=self.namespace)
 
     def delete(self):
         """Delete the configmap."""
@@ -102,7 +102,8 @@ class HotelReservation(Application):
             print(f"Deleted PersistentVolume {pv}: {delete_result.strip()}")
         time.sleep(5)
 
-        self.wrk.stop()
+        if hasattr(self, "wrk"):
+            self.wrk.stop()
 
     def _remove_pv_finalizers(self, pv_name: str):
         """Remove finalizers from the PersistentVolume to prevent it from being stuck in a 'Terminating' state."""

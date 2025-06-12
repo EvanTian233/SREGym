@@ -9,9 +9,9 @@ from srearena.conductor.problems.image_slow_load import ImageSlowLoad
 from srearena.conductor.problems.kafka_queue_problems import KafkaQueueProblems
 from srearena.conductor.problems.loadgenerator_flood_homepage import LoadGeneratorFloodHomepage
 from srearena.conductor.problems.misconfig_app import MisconfigAppHotelRes
+from srearena.conductor.problems.missing_service import MissingService
 from srearena.conductor.problems.network_delay import ChaosMeshNetworkDelay
 from srearena.conductor.problems.network_loss import ChaosMeshNetworkLoss
-from srearena.conductor.problems.no_op import NoOp
 from srearena.conductor.problems.payment_service_failure import PaymentServiceFailure
 from srearena.conductor.problems.payment_service_unreachable import PaymentServiceUnreachable
 from srearena.conductor.problems.pod_failure import ChaosMeshPodFailure
@@ -19,13 +19,12 @@ from srearena.conductor.problems.pod_kill import ChaosMeshPodKill
 from srearena.conductor.problems.product_catalog_failure import ProductCatalogServiceFailure
 from srearena.conductor.problems.recommendation_service_cache_failure import RecommendationServiceCacheFailure
 from srearena.conductor.problems.redeploy_without_pv import RedeployWithoutPV
+from srearena.conductor.problems.resource_request import ResourceRequestTooLarge, ResourceRequestTooSmall
 from srearena.conductor.problems.revoke_auth import MongoDBRevokeAuth
 from srearena.conductor.problems.scale_pod import ScalePodSocialNet
 from srearena.conductor.problems.storage_user_unregistered import MongoDBUserUnregistered
 from srearena.conductor.problems.target_port import K8STargetPortMisconfig
 from srearena.conductor.problems.wrong_bin_usage import WrongBinUsage
-
-# TODO: move noop out of problem registry (https://github.com/xlab-uiuc/SREArena/issues/68)
 
 
 class ProblemRegistry:
@@ -45,9 +44,6 @@ class ProblemRegistry:
             "chaos_mesh_pod_kill": ChaosMeshPodKill,
             "chaos_mesh_network_loss": ChaosMeshNetworkLoss,
             "chaos_mesh_network_delay": ChaosMeshNetworkDelay,
-            "noop_hotel_reservation": lambda: NoOp(app_name="hotel_reservation"),
-            "noop_social_network": lambda: NoOp(app_name="social_network"),
-            "noop_astronomy_shop": lambda: NoOp(app_name="astronomy_shop"),
             "astronomy_shop_ad_service_failure": AdServiceFailure,
             "astronomy_shop_ad_service_high_cpu": AdServiceHighCpu,
             "astronomy_shop_ad_service_manual_gc": AdServiceManualGc,
@@ -61,6 +57,19 @@ class ProblemRegistry:
             "astronomy_shop_recommendation_service_cache_failure": RecommendationServiceCacheFailure,
             "redeploy_without_PV": RedeployWithoutPV,
             "wrong_bin_usage": WrongBinUsage,
+            "missing_service_hotel_reservation": lambda: MissingService(
+                app_name="hotel_reservation", faulty_service="mongodb-rate"
+            ),
+            "missing_service_social_network": lambda: MissingService(
+                app_name="social_network", faulty_service="user-service"
+            ),
+            "resource_request_too_large": lambda: ResourceRequestTooLarge(
+                app_name="hotel_reservation", faulty_service="mongodb-rate"
+            ),
+            "resource_request_too_small": lambda: ResourceRequestTooSmall(
+                app_name="hotel_reservation", faulty_service="mongodb-rate"
+            ),
+            # "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
             # K8S operator misoperation -> Refactor later, not sure if they're working
             # They will also need to be updated to the new problem format.
             # "operator_overload_replicas-detection-1": K8SOperatorOverloadReplicasDetection,
@@ -93,16 +102,3 @@ class ProblemRegistry:
         if task_type:
             return len([k for k in self.PROBLEM_REGISTRY.keys() if task_type in k])
         return len(self.PROBLEM_REGISTRY)
-
-    def get_matching_noop_id(self, app) -> str | None:
-        app_name = app.__class__.__name__.lower()
-
-        if "hotel" in app_name:
-            return "noop_hotel_reservation"
-        elif "social" in app_name:
-            return "noop_social_network"
-        elif "astronomy" in app_name or "shop" in app_name:
-            return "noop_astronomy_shop"
-        else:
-            print(f"[WARN] No matching noop problem found for app: {app_name}")
-            return None
