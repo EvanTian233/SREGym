@@ -276,13 +276,13 @@ class VirtualizationFaultInjector(FaultInjector):
     def inject_wrong_service_selector(self, microservices: list[str]):
         for service in microservices:
             print(f"Injecting wrong selector for service: {service} | namespace: {self.namespace}")
-            
+
             service_config = self.kubectl.get_service_json(service, self.namespace)
             current_selectors = service_config.get("spec", {}).get("selector", {})
-            
+
             # Adding a wrong selector to the service
             current_selectors["current_service_name"] = service
-            service_config["spec"]["selector"] = current_selectors            
+            service_config["spec"]["selector"] = current_selectors
             self.kubectl.patch_service(service, self.namespace, service_config)
 
             print(f"Patched service {service} with selector {service_config['spec']['selector']}")
@@ -290,13 +290,13 @@ class VirtualizationFaultInjector(FaultInjector):
     def recover_wrong_service_selector(self, microservices: list[str]):
         for service in microservices:
             service_config = self.kubectl.get_service_json(service, self.namespace)
-            
+
             service_config = self.kubectl.get_service_json(service, self.namespace)
             current_selectors = service_config.get("spec", {}).get("selector", {})
-            
+
             # Removing the wrong selector
             del current_selectors["current_service_name"]
-            service_config["spec"]["selector"] = current_selectors            
+            service_config["spec"]["selector"] = current_selectors
             self.kubectl.patch_service(service, self.namespace, service_config)
 
             print(f"Recovered from wrong service selector fault for service: {service}")

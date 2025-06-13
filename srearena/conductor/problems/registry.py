@@ -70,7 +70,7 @@ class ProblemRegistry:
             "resource_request_too_small": lambda: ResourceRequestTooSmall(
                 app_name="hotel_reservation", faulty_service="mongodb-rate"
             ),
-            "wrong_service_selector": lambda: WrongServiceSelector(app_name="astronomy_shop", faulty_service="payment"),
+            "wrong_service_selector": lambda: WrongServiceSelector(app_name="astronomy_shop", faulty_service="frontend"),
             # "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
             # K8S operator misoperation -> Refactor later, not sure if they're working
             # They will also need to be updated to the new problem format.
