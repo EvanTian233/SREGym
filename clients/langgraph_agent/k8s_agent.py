@@ -39,8 +39,11 @@ class XAgent:
         ]
         self.file_editing_tools = [open_file, goto_line, create, edit, insert]
         self.llm = llm
+
+        # here are testing purposes attr
         self.test_campaign_file = ""
         self.test_tool_or_ai_response = "tool"
+        self.test_tool_call_idx = 0
 
     def test_campaign_setter(self, test_campaign_file):
         self.test_campaign_file = test_campaign_file
@@ -81,7 +84,7 @@ class XAgent:
         return END
 
     def mock_llm_inference_step(self, state: State):
-        print(f"[mock llm] called by graph.")
+        print(f"[mock llm] called by graph, currently on {self.test_tool_call_idx}th tool call")
         ai_message_template = AIMessage(
             content="",
             additional_kwargs={
@@ -112,12 +115,10 @@ class XAgent:
                 },
                 "model_name": "gpt-4o-2024-08-06",
                 "system_fingerprint": "fp_07871e2ad8",
-                "id": "chatcmpl-Bhh2o2j0cJ5jw6wTll8TXTzifUvJF",
                 "service_tier": "default",
                 "finish_reason": "tool_calls",
                 "logprobs": None,
             },
-            id="run--d19df02c-3833-4866-b9d9-998d43e90179-0",
             tool_calls=[
                 {
                     "name": "",
@@ -142,43 +143,45 @@ class XAgent:
         print(f"[mock llm] msg branch: {self.test_tool_or_ai_response}")
         test_campaign = yaml.safe_load(open(self.test_campaign_file, "r"))
         print(f"[mock llm] test campaign tool calls: {test_campaign['tool_calls']}")
-        for tool_call in test_campaign["tool_calls"]:
-            if self.test_tool_or_ai_response == "tool":
-                function_name = tool_call["name"]
-                function_args = {key: value for key, value in tool_call.items() if key != "name"}
-                function_args_str = json.dumps(function_args)
-                ai_message_template.additional_kwargs["tool_calls"][0]["function"]["arguments"] = function_args_str
-                ai_message_template.additional_kwargs["tool_calls"][0]["function"]["name"] = function_name
-                ai_message_template.tool_calls[0]["name"] = function_name
-                ai_message_template.tool_calls[0]["args"] = function_args
-                logger.info(
-                    "[mock llm] type: %s, ai message returned: %s", type(ai_message_template), ai_message_template
-                )
-                print(f"[mock llm] tool calling, returning to ai")
-                logger.info("[mock llm] tool calling, returning to ai")
-            elif self.test_tool_or_ai_response == "ai":
-                ai_message_template.tool_calls = []
-                ai_message_template.content = "test"
-                print(f"[mock llm] ai messaging, returning to tool")
-                logger.info("[mock llm] ai messaging, returning to tool")
+        if self.test_tool_or_ai_response == "tool":
+            tool_call = test_campaign["tool_calls"][self.test_tool_call_idx]
+            function_name = tool_call["name"]
+            function_args = {key: value for key, value in tool_call.items() if key != "name"}
+            function_args_str = json.dumps(function_args)
+            ai_message_template.additional_kwargs["tool_calls"][0]["function"]["arguments"] = function_args_str
+            ai_message_template.additional_kwargs["tool_calls"][0]["function"]["name"] = function_name
+            ai_message_template.tool_calls[0]["name"] = function_name
+            ai_message_template.tool_calls[0]["args"] = function_args
+            logger.info("[mock llm] type: %s, ai message returned: %s", type(ai_message_template), ai_message_template)
+            print(f"[mock llm] tool calling, returning to ai")
+            logger.info("[mock llm] tool calling, returning to ai")
+            self.test_tool_call_idx += 1
+        elif self.test_tool_or_ai_response == "ai":
+            ai_message_template.tool_calls = []
+            ai_message_template.content = "test"
+            ai_message_template.additional_kwargs = {"refusal": None}
+            ai_message_template.response_metadata["finish_reason"] = "stop"
+            print(f"[mock llm] ai messaging, returning to tool")
+            logger.info("[mock llm] ai messaging, returning to tool")
 
-            if self.test_tool_or_ai_response == "tool":
-                self.test_tool_or_ai_response = "ai"
-            elif self.test_tool_or_ai_response == "ai":
-                self.test_tool_or_ai_response = "tool"
+        if self.test_tool_or_ai_response == "tool":
+            self.test_tool_or_ai_response = "ai"
+        elif self.test_tool_or_ai_response == "ai":
+            self.test_tool_or_ai_response = "tool"
 
-            logger.info(
-                "[mock llm] next msg branch: %s, messages returns: %s",
-                self.test_tool_or_ai_response,
-                [state["messages"] + [ai_message_template]],
-            )
-            print(f"[mock llm] next msg branch: {self.test_tool_or_ai_response}")
-            print(f"[mock llm] messages returns: {state['messages'] + [ai_message_template]}")
-            yield {
-                "messages": state["messages"] + [ai_message_template],
-                "curr_file": state["curr_file"],
-                "curr_line": state["curr_line"],
-            }
+        logger.info(
+            "[mock llm] next msg branch: %s, messages returns: %s",
+            self.test_tool_or_ai_response,
+            state["messages"] + [ai_message_template],
+        )
+        print(f"[mock llm] next msg branch: {self.test_tool_or_ai_response}")
+        print(f"[mock llm] messages returns: {state["messages"] + [ai_message_template]}")
+        output = [*state["messages"], ai_message_template]
+        return {
+            "messages": output,
+            "curr_file": state["curr_file"],
+            "curr_line": state["curr_line"],
+        }
 
     # this is the agent node. it simply queries the llm and return the results
     def llm_inference_step(self, state: State):
@@ -249,6 +252,7 @@ class XAgent:
         last_state = self.graph.get_state(config=config)
         logger.info("last state: %s", last_state)
         if len(last_state.values) != 0:
+            logger.info("last state values: %s", last_state.values["messages"])
             msgs = last_state.values["messages"] + [{"role": "user", "content": user_input}]
             workdir = last_state.values["workdir"]
             curr_file = last_state.values["curr_file"]
@@ -268,11 +272,6 @@ class XAgent:
             stream_mode="values",
         ):
             event["messages"][-1].pretty_print()
-            for value in event.values():
-                try:
-                    logger.info("Assistant: %s", value["messages"][-1].content)
-                except TypeError as e:
-                    pass
 
     def save_agent_graph_to_png(self):
         with open("./agent_graph.png", "wb") as png:
