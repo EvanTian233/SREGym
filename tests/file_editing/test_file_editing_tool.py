@@ -33,7 +33,7 @@ USER_INPUTS = [
     (
         [
             # open an existing file
-            "open /Users/yms/tianyins_group/srearena/clients/langgraph_agent/tools/text_editing/example.txt at line 1"
+            "open /Users/yms/tianyins_group/srearena/tests/file_editing/example.txt at line 1"
         ],
         "hello world",
     ),
@@ -46,9 +46,10 @@ class TestOpenFile:
         xagent = get_agent()
         xagent.test_campaign_setter(f"{ROOT_REPO_PATH}/tests/file_editing/open_1.yaml")
         feed_input_to_agent(xagent, test_tuple)
+        config = {"configurable": {"thread_id": "1"}}
         assert (
-            xagent.graph.get_state().values["curr_file"]
-            == "/Users/yms/tianyins_group/srearena/clients/langgraph_agent/tools/text_editing/example.txt"
+            xagent.graph.get_state(config).values["curr_file"]
+            == "/Users/yms/tianyins_group/srearena/tests/file_editing/example.txt"
         )
-        assert xagent.graph.get_state().values["curr_line"] == 1
-        assert xagent.graph.get_state().values["messages"][-1].content == expected_result
+        assert xagent.graph.get_state(config).values["curr_line"] == 1
+        assert xagent.graph.get_state(config).values["messages"][-1].content == expected_result
