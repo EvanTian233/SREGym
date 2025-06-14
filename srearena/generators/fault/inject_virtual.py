@@ -362,7 +362,7 @@ class VirtualizationFaultInjector(FaultInjector):
                 "kubectl -n kube-system rollout status deployment coredns --timeout=30s"
             )
             
-            print(f"Injected Single Service NXDOMAIN fault for service: {service}")
+            print(f"Injected Service DNS Resolution Failure fault for service: {service}")
             
     def recover_service_dns_resolution_failure(self, microservices: list[str]):
         for service in microservices:
@@ -423,7 +423,7 @@ class VirtualizationFaultInjector(FaultInjector):
                 "kubectl -n kube-system rollout status deployment coredns --timeout=30s"
             )
             
-            print(f"Recovered Single Service NXDOMAIN fault for service: {service}")
+            print(f"Recovered Service DNS Resolution Failure fault for service: {service}")
 
     ############# HELPER FUNCTIONS ################
     def _wait_for_pods_ready(self, microservices: list[str], timeout: int = 30):
