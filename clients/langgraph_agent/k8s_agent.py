@@ -54,6 +54,7 @@ class XAgent:
         Use in the conditional_edge to route to the ToolNode if the last message
         has tool calls. Otherwise, route to the end.
         """
+        print(f"[route tools] in route tools: {state}")
         logger.info("in route tools: %s", state)
         file_tool_names = ["open_file", "goto_line", "create", "edit", "insert"]
         observability_tool_names = ["get_traces", "get_services", "get_operations"]
@@ -75,10 +76,12 @@ class XAgent:
             else:
                 logger.info("invoking tool node: end")
                 return END
+        print("no tool call, returning END")
         logger.info("no tool call, returning END")
         return END
 
     def mock_llm_inference_step(self, state: State):
+        print(f"[mock llm] called by graph.")
         ai_message_template = AIMessage(
             content="",
             additional_kwargs={
@@ -136,7 +139,9 @@ class XAgent:
         )
 
         logger.info("invoking mock llm inference, custom state: %s", state)
+        print(f"[mock llm] msg branch: {self.test_tool_or_ai_response}")
         test_campaign = yaml.safe_load(open(self.test_campaign_file, "r"))
+        print(f"[mock llm] test campaign tool calls: {test_campaign['tool_calls']}")
         for tool_call in test_campaign["tool_calls"]:
             if self.test_tool_or_ai_response == "tool":
                 function_name = tool_call["name"]
@@ -149,10 +154,12 @@ class XAgent:
                 logger.info(
                     "[mock llm] type: %s, ai message returned: %s", type(ai_message_template), ai_message_template
                 )
+                print(f"[mock llm] tool calling, returning to ai")
                 logger.info("[mock llm] tool calling, returning to ai")
             elif self.test_tool_or_ai_response == "ai":
                 ai_message_template.tool_calls = []
                 ai_message_template.content = "test"
+                print(f"[mock llm] ai messaging, returning to tool")
                 logger.info("[mock llm] ai messaging, returning to tool")
 
             if self.test_tool_or_ai_response == "tool":
@@ -161,10 +168,12 @@ class XAgent:
                 self.test_tool_or_ai_response = "tool"
 
             logger.info(
-                "[mock llm] msg branch: %s, messages returns: %s",
+                "[mock llm] next msg branch: %s, messages returns: %s",
                 self.test_tool_or_ai_response,
                 [state["messages"] + [ai_message_template]],
             )
+            print(f"[mock llm] next msg branch: {self.test_tool_or_ai_response}")
+            print(f"[mock llm] messages returns: {state['messages'] + [ai_message_template]}")
             yield {
                 "messages": state["messages"] + [ai_message_template],
                 "curr_file": state["curr_file"],

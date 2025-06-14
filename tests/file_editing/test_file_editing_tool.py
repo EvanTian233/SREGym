@@ -43,6 +43,7 @@ class TestOpenFile:
         print(f"xagent msg switch branch: {xagent.test_tool_or_ai_response}")
         xagent.test_campaign_setter(test_campaign_file)
         test_campaign = yaml.safe_load(open(test_campaign_file, "r"))
+        print(f"test campaign: {test_campaign}")
         test_user_inputs = test_campaign["user_inputs"]
         feed_input_to_agent(xagent, test_user_inputs)
         config = {"configurable": {"thread_id": "1"}}
