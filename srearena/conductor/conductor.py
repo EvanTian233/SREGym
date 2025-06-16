@@ -134,6 +134,7 @@ class Conductor:
                 print(f"[Session Start] Problem ID: {self.problem_id}")
                 print("Setting up OpenEBS...")
                 self.kubectl.exec_command("kubectl apply -f https://openebs.github.io/charts/openebs-operator.yaml")
+                self.kubectl.exec_command("kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml")
                 self.kubectl.exec_command(
                     'kubectl patch storageclass openebs-hostpath -p \'{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}\''
                 )
