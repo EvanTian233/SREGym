@@ -7,7 +7,7 @@ from typing import Optional
 import yaml
 from kubectl import KubeCtl
 from pydantic.dataclasses import dataclass
-from config import KubectlToolCfg
+from mcp_server.configs.kubectl_tool_cfg import KubectlToolCfg
 from utils import cleanup_kubernetes_yaml
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

@@ -5,7 +5,7 @@ import time
 import bashlex
 from kubectl import KubeCtl, DryRunResult, DryRunStatus
 
-from config import KubectlToolCfg
+from mcp_server.configs.kubectl_tool_cfg import KubectlToolCfg
 from utils import cleanup_kubernetes_yaml, parse_text
 from rollback_tool import RollbackCommand, RollbackNode, RollbackTool
 from cmd_category import \

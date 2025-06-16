@@ -6,7 +6,7 @@ from yarl import URL
 from cachetools import TTLCache
 from kubectl_server_helper.kubectl_cmd_runner import KubectlCmdRunner
 from kubectl_server_helper.rollback_tool import RollbackTool
-from kubectl_server_helper.config import KubectlToolCfg
+from mcp_server.configs.kubectl_tool_cfg import KubectlToolCfg
 from mcp_server.kubectl_server_helper.action_stack import ActionStack
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

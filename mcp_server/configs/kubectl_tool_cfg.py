@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 from pathlib import Path
 import os
 
-current_dir = Path(__file__).resolve().parent
+parent_parent_dir = Path(__file__).resolve().parent.parent
 
 
 class KubectlToolCfg(BaseModel):
@@ -24,7 +24,7 @@ class KubectlToolCfg(BaseModel):
 
     # update the output dir with session id if using remote mcp server
     output_dir: str = Field(
-        default=str(current_dir / "data"),
+        default=str(parent_parent_dir / "data"),
         description="Directory to store some data used by kubectl server."
     )
 
