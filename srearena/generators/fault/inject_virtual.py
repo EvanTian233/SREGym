@@ -592,7 +592,7 @@ class VirtualizationFaultInjector(FaultInjector):
                 "command": [
                     "sh",
                     "-c",
-                    f"while true; do nc -lk -p {port} >/dev/null 2>&1; done",
+                    f"exec nc -lk -p {port}",
                 ],
                 "ports": [
                     {
@@ -617,6 +617,8 @@ class VirtualizationFaultInjector(FaultInjector):
             # Save the *original* deployment YAML for recovery
             self._write_yaml_to_file(service, original_deployment_yaml)
 
+            self.kubectl.wait_for_stable(self.namespace)
+
             print(f"Injected sidecar port conflict fault for service: {service}")
 
     def recover_sidecar_port_conflict(self, microservices: list[str]):
@@ -629,6 +631,8 @@ class VirtualizationFaultInjector(FaultInjector):
 
             apply_result = self.kubectl.exec_command(apply_cmd)
             print(f"Apply result for {service}: {apply_result}")
+
+            self.kubectl.wait_for_ready(self.namespace)
 
             print(f"Recovered from sidecar port conflict fault for service: {service}")
 
