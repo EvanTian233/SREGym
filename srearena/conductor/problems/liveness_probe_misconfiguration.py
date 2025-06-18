@@ -12,7 +12,7 @@ from srearena.service.kubectl import KubeCtl
 from srearena.utils.decorators import mark_fault_injected
 
 
-class LivenessProbeMisconfiguration(Problem):  
+class LivenessProbeMisconfiguration(Problem):
     def __init__(self, app_name="social_network", faulty_service="user-service"):
         self.app_name = app_name
         self.faulty_service = faulty_service
@@ -20,17 +20,15 @@ class LivenessProbeMisconfiguration(Problem):
         if app_name == "social_network":
             self.app = SocialNetwork()
             self.app.create_workload(duration=30)
-            
 
         elif app_name == "hotel_reservation":
             self.app = HotelReservation()
             self.app.create_workload(duration=30)
-            
 
         elif app_name == "astronomy_shop":
             self.app = AstronomyShop()
             self.app.create_workload()
-            
+
         else:
             raise ValueError(f"Unsupported app name: {app_name}")
 
@@ -46,7 +44,6 @@ class LivenessProbeMisconfiguration(Problem):
             MitigationOracle(problem=self),
             WorkloadOracle(problem=self, wrk_manager=self.app.wrk),
         )
-
 
     @mark_fault_injected
     def inject_fault(self):
@@ -65,4 +62,3 @@ class LivenessProbeMisconfiguration(Problem):
             microservices=[self.faulty_service],
         )
         print(f"Service: {self.faulty_service} | Namespace: {self.namespace}\n")
- 
