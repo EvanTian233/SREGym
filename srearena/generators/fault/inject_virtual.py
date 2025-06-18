@@ -650,7 +650,7 @@ class VirtualizationFaultInjector(FaultInjector):
                 container["readinessProbe"] = {
                     "httpGet": {"path": f"/healthz", "port": 8080},
                     "initialDelaySeconds": initial_delay,
-                    "periodSeconds": 15,
+                    "periodSeconds": 10,
                     "failureThreshold": 1,
                 }
 
@@ -667,9 +667,6 @@ class VirtualizationFaultInjector(FaultInjector):
 
             # Save the *original* deployment YAML for recovery
             self._write_yaml_to_file(service, original_deployment_yaml)
-
-            # Wait for the initial_delay+buffer_time to pass so that readiness probe is triggered
-            time.sleep(initial_delay+5)
 
             print(f"Injected readiness probe misconfiguration fault for service: {service}")
 
@@ -705,9 +702,12 @@ class VirtualizationFaultInjector(FaultInjector):
                 container["livenessProbe"] = {
                     "httpGet": {"path": f"/healthz", "port": 8080},
                     "initialDelaySeconds": initial_delay,
-                    "periodSeconds": 15,
+                    "periodSeconds": 10,
                     "failureThreshold": 1,
                 }
+
+            # Set terminationGracePeriodSeconds at the pod template spec level (not inside a container spec)
+            deployment_yaml["spec"]["template"]["spec"]["terminationGracePeriodSeconds"] = 0
 
             modified_yaml_path = self._write_yaml_to_file(service, deployment_yaml)
 
@@ -722,9 +722,6 @@ class VirtualizationFaultInjector(FaultInjector):
 
             # Save the *original* deployment YAML for recovery
             self._write_yaml_to_file(service, original_deployment_yaml)
-
-            # Wait for the initial_delay+buffer_time to pass so that liveness probe is triggered
-            time.sleep(initial_delay+60)
 
             print(f"Injected liveness probe misconfiguration fault for service: {service}")
 
