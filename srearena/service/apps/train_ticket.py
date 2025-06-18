@@ -1,6 +1,9 @@
 """Interface to the Train Ticket application"""
 
 import time
+import tempfile
+import os
+from pathlib import Path
 
 from srearena.paths import TARGET_MICROSERVICES, TRAIN_TICKET_METADATA
 from srearena.service.apps.base import Application
@@ -13,6 +16,7 @@ class TrainTicket(Application):
         super().__init__(str(TRAIN_TICKET_METADATA))
         self.load_app_json()
         self.kubectl = KubeCtl()
+        self.workload_manager = None
         self.create_namespace()
 
     def load_app_json(self):
@@ -27,6 +31,7 @@ class TrainTicket(Application):
             self.kubectl.create_namespace_if_not_exist(self.namespace)
 
         self._deploy_flagd_infrastructure()
+        self._deploy_locust()
 
         Helm.install(**self.helm_configs)
         Helm.assert_if_deployed(self.helm_configs["namespace"])
@@ -44,8 +49,32 @@ class TrainTicket(Application):
             self.kubectl.delete_namespace(self.namespace)
 
     def start_workload(self):
-        # TODO: implement workload generator
-        pass
+        """Start TrainTicket workload using Locust."""
+        try:
+            from srearena.generators.workload.trainticket_locust import TrainTicketLocustWorkloadManager
+            
+            if not self.workload_manager:
+                self.workload_manager = TrainTicketLocustWorkloadManager(
+                    namespace=self.namespace,
+                    kubectl=self.kubectl
+                )
+            
+            self.workload_manager.start()
+            # Trigger F1 scenario with moderate load
+            self.workload_manager.trigger_f1_scenario(user_count=5, spawn_rate=1)
+            print("[TrainTicket] Workload started - F1 scenario active")
+            
+        except Exception as e:
+            print(f"[TrainTicket] Warning: Failed to start workload: {e}")
+
+    def stop_workload(self):
+        """Stop the current workload."""
+        if self.workload_manager:
+            try:
+                self.workload_manager.stop_workload()
+                print("[TrainTicket] Workload stopped")
+            except Exception as e:
+                print(f"[TrainTicket] Warning: Failed to stop workload: {e}")
 
     def _deploy_flagd_infrastructure(self):
         """Deploy flagd service and ConfigMap for fault injection."""
@@ -65,6 +94,35 @@ class TrainTicket(Application):
         except Exception as e:
             print(f"[TrainTicket] Warning: Failed to deploy flagd infrastructure: {e}")
 
+    def _deploy_locust(self):
+        """Deploy Locust load generator from srearena/resources"""
+        try:
+            # Update path to use srearena/resources instead of aiopslab-applications
+            locust_resources_path = Path(__file__).parent.parent.parent / "resources" / "trainticket"
+            
+            # Apply Locust configurations
+            for file in ["locust-configmap.yaml", "locust-deployment.yaml"]:
+                yaml_path = locust_resources_path / file
+                if yaml_path.exists():
+                    # Need to process the template first
+                    with open(yaml_path, 'r') as f:
+                        content = f.read()
+                    # Replace {{ .Values.namespace }} with actual namespace
+                    content = content.replace('{{ .Values.namespace }}', self.namespace)
+                    
+                    # Write to temp file and apply
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as tmp:
+                        tmp.write(content)
+                        temp_path = tmp.name
+                    
+                    result = self.kubectl.exec_command(f"kubectl apply -f {temp_path}")
+                    os.unlink(temp_path)
+                    print(f"[TrainTicket] Applied {file}: {result}")
+                    
+            print("[TrainTicket] Locust workload generator deployed")
+        except Exception as e:
+            print(f"[TrainTicket] Warning: Failed to deploy Locust: {e}")
+
     def get_flagd_status(self):
         """Check if flagd infrastructure is running."""
         try:
@@ -72,6 +130,12 @@ class TrainTicket(Application):
             return "Running" in result
         except Exception:
             return False
+
+    def get_workload_stats(self):
+        """Get current workload statistics."""
+        if self.workload_manager:
+            return self.workload_manager.get_stats()
+        return {}
 
 
 # if __name__ == "__main__":
