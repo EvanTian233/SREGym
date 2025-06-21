@@ -648,7 +648,7 @@ class VirtualizationFaultInjector(FaultInjector):
             for container in containers:
                 probe = container.get("livenessProbe")
                 if probe:
-                    probe["initialDelaySeconds"] = 1
+                    probe["initialDelaySeconds"] = 0
                     probe["periodSeconds"] = 1
                     probe["failureThreshold"] = 1
 
