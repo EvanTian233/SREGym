@@ -10,7 +10,7 @@ import bashlex
 from kubernetes import config
 from pydantic.dataclasses import dataclass
 
-from .utils import parse_text
+from mcp_server.kubectl_server_helper.utils import parse_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -48,17 +48,18 @@ class KubeCtl:
             out.stderr = out.stderr.decode("utf-8")
             return out
         except subprocess.CalledProcessError as e:
+            e.stderr = e.stderr.decode("utf-8")
             return e
 
     @staticmethod
     def exec_command_result(command: str, input_data=None) -> str:
         result = KubeCtl.exec_command(command, input_data)
         if result.returncode == 0:
-            logger.info(f"Command execution: {parse_text(result.stdout, 500)}")
+            logger.info(f"Command execution:\n{parse_text(result.stdout, 500)}")
             return result.stdout
         else:
-            logger.error(f"Error executing kubectl command: {result.stderr}")
-            return f"Error executing kubectl command: {result.stderr}"
+            logger.error(f"Error executing kubectl command:\n{result.stderr}")
+            return f"Error executing kubectl command:\n{result.stderr}"
 
     @staticmethod
     def extract_namespace_from_command(command: str) -> str:

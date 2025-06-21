@@ -1,5 +1,4 @@
 import logging
-import threading
 
 from .rollback_tool import RollbackNode
 
@@ -14,17 +13,8 @@ logging.basicConfig(
 
 
 class ActionStack:
-    """A thread-safe global stack to store key-value pairs of agent actions."""
-
-    _instance = None
-    _lock = threading.Lock()
-
-    def __new__(cls):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super(ActionStack, cls).__new__(cls)
-                cls._instance.stack = []  # Stack of (action, rollback)
-        return cls._instance
+    def __init__(self):
+        self.stack = []
 
     def push(self, node: RollbackNode):
         """Push a new action onto the stack."""

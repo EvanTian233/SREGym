@@ -8,7 +8,7 @@ import yaml
 from .kubectl import KubeCtl
 from pydantic.dataclasses import dataclass
 from mcp_server.configs.kubectl_tool_cfg import KubectlToolCfg
-from .utils import cleanup_kubernetes_yaml
+from .utils import cleanup_kubernetes_yaml, parse_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -223,6 +223,9 @@ class RollbackTool:
         )
         return "".join(result)
 
+    def get_previous_rollbackable_cmds(self) -> list[str]:
+        return [action.action for action in self.action_stack.stack][::-1]
+
     def rollback(self) -> str:
         if not hasattr(self, "action_stack") or self.action_stack is None:
             return "Warning: Action Stack disabled. Stop rolling back."
@@ -233,13 +236,32 @@ class RollbackTool:
             last_action: Optional[RollbackNode] = self.action_stack.pop()
 
             if last_action is not None:
+                result = []
                 for rollback in last_action.rollback:
                     if rollback.command_type == "command":
-                        KubeCtl.exec_command(rollback.content)
+                        one_step_result = KubeCtl.exec_command(rollback.content)
+
+                        if one_step_result.returncode == 0:
+                            output = parse_text(one_step_result.stdout, 1000)
+                            result.append(f"Rollback command: {rollback.content}; "
+                                          f"Execution result: {output}")
+                            logger.info(result[-1])
+                        else:
+                            raise RuntimeError(f"Error executing rollback command: {one_step_result.stderr}")
+
                     elif rollback.command_type == "file":
-                        self._restore_cluster_state(rollback.content)
+                        one_step_result = self._restore_cluster_state(rollback.content)
+                        result.append(f"Try to restore cluster state with file {rollback.content}. "
+                                      f"Result: {one_step_result}")
+                        logger.info(result[-1])
                     else:
                         raise ValueError(f"Unknown rollback type: {rollback.type}")
+
+                rollback_process_desc = f"Rolled back the previous command: {last_action.action}.\n" \
+                                        f"-------------------Rollback Process:-------------------\n"
+                for i, one_step_txt in enumerate(result):
+                    rollback_process_desc += f"\nStep {i + 1}:\n{one_step_txt}\n"
+                rollback_process_desc += f"-------------------End of Rollback Process:-------------------\n"
 
                 if self.config.validate_rollback:
                     time.sleep(self.config.retry_wait_time)
@@ -264,7 +286,7 @@ class RollbackTool:
                     with open(ref_file, "w") as f:
                         f.write(current_state)
 
-                return f"Rolled back the previous command: {last_action.action}, using rollback:{rollback.content}"
+                return rollback_process_desc
             return "No more actions to rollback."
 
         except Exception as e:

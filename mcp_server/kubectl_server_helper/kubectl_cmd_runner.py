@@ -113,7 +113,8 @@ class KubectlCmdRunner:
         parts = list(bashlex.split(command))
         for i, part in enumerate(parts):
             if part in ["--interactive", "-i", "--tty", "-t", "--stdin", "-it"]:
-                raise ValueError(f"Interactive flag detected: {part}. Such commands are not supported.")
+                raise ValueError(f"Interactive flag detected: {part}. Such commands are not supported. "
+                                 f"Try to use the command non-interactively.")
 
             if part in ["-f", "--filename"] and i + 1 < len(parts) and parts[i + 1] == "-":
                 if not has_redirection:
@@ -133,11 +134,11 @@ class KubectlCmdRunner:
         result = KubeCtl.exec_command(command)
         if result.returncode == 0:
             output = parse_text(result.stdout, 1000)
-            logger.info(f"Kubectl MCP Tool command execution: {output}")
+            logger.info(f"Kubectl MCP Tool command execution:\n{output}")
             return result.stdout
         else:
-            logger.error(f"Error executing kubectl command: {result.stderr}")
-            raise RuntimeError(f"Error executing kubectl command: {result.stderr}")
+            logger.error(f"Error executing kubectl command:\n{result.stderr}")
+            raise RuntimeError(f"Error executing kubectl command:\n{result.stderr}")
 
     def _gen_rollback_commands(self, command: str, dry_run_result: DryRunResult) -> RollbackNode:
         """Generate rollback commands based on the dry-run result."""
@@ -161,6 +162,9 @@ class KubectlCmdRunner:
             # Although should be "default"
             namespace = self.config.namespace
 
+        # namespace flag + content
+        nsp_flag_ctnt = f"-n {namespace}" if namespace else ""
+
         rollback_commands = []
 
         if "created (server dry run)" in dry_run_stdout or "exposed (server dry run)" in dry_run_stdout:
@@ -168,10 +172,10 @@ class KubectlCmdRunner:
             rollback_commands = [
                 RollbackCommand(
                     "command",
-                    "kubectl delete {resource_type} {resource_name} -n {namespace}".format(
+                    "kubectl delete {resource_type} {resource_name} {nsp_flag_ctnt}".format(
                         resource_type=result.result[0],
                         resource_name=result.result[1],
-                        namespace=namespace,
+                        nsp_flag_ctnt=nsp_flag_ctnt,
                     ),
                 )
             ]
@@ -194,10 +198,10 @@ class KubectlCmdRunner:
             rollback_commands = [
                 RollbackCommand(
                     "command",
-                    "kubectl delete {resource_type} {resource_name} -n {namespace}".format(
+                    "kubectl delete {resource_type} {resource_name} {nsp_flag_ctnt}".format(
                         resource_type=hpa.result[0],
                         resource_name=hpa.result[1],
-                        namespace=namespace,
+                        nsp_flag_ctnt=nsp_flag_ctnt,
                     ),
                 ),
                 self._store_resource_state(
