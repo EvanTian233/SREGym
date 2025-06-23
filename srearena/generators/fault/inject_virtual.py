@@ -637,7 +637,7 @@ class VirtualizationFaultInjector(FaultInjector):
 
             print(f"Recovered from sidecar port conflict fault for service: {service}")
 
-    # V.14 - Inject ConfigMap drift by removing critical keys
+    # Inject ConfigMap drift by removing critical keys
     def inject_configmap_drift(self, microservices: list[str]):
 
         for service in microservices:
@@ -648,7 +648,12 @@ class VirtualizationFaultInjector(FaultInjector):
             original_config = json.loads(config_json_str)
             print(f"Read original config from {service} pod")
             
-            # Create a copy and remove the critical key
+            # Save the original config to a file for recovery
+            original_config_path = f"/tmp/{service}-original-config.json"
+            with open(original_config_path, "w") as f:
+                json.dump(original_config, f, indent=2)
+            print(f"Saved original config to {original_config_path}")
+            
             fault_config = copy.deepcopy(original_config)
             key_to_remove = None
             
@@ -661,16 +666,11 @@ class VirtualizationFaultInjector(FaultInjector):
                 
             configmap_name = f"{service}-config"
             fault_config_json = json.dumps(fault_config, indent=2)
-        
-            temp_config_path = f"/tmp/{service}-config-fault.json"
-            with open(temp_config_path, "w") as f:
-                f.write(fault_config_json)
             
-            create_cm_cmd = f"kubectl create configmap {configmap_name} --from-file=config.json={temp_config_path} -n {self.namespace} --dry-run=client -o yaml | kubectl apply -f -"
+            create_cm_cmd = f"""kubectl create configmap {configmap_name} -n {self.namespace} --from-literal=config.json='{fault_config_json}' --dry-run=client -o yaml | kubectl apply -f -"""
             self.kubectl.exec_command(create_cm_cmd)
-            
             print(f"Created ConfigMap {configmap_name} with {key_to_remove} removed")
-            
+                
             json_patch = [
                 {
                     "op": "add",
@@ -712,42 +712,39 @@ class VirtualizationFaultInjector(FaultInjector):
                 json_patch[1]["op"] = "add"
                 json_patch[1]["path"] = "/spec/template/spec/containers/0/volumeMounts"
                 json_patch[1]["value"] = [json_patch[1]["value"]]
-            
 
             patch_json_str = json.dumps(json_patch)
             patch_cmd = f"kubectl patch deployment {service} -n {self.namespace} --type='json' -p='{patch_json_str}'"
             patch_result = self.kubectl.exec_command(patch_cmd)
             print(f"Patch result for {service}: {patch_result}")
-            
+
             self.kubectl.exec_command(f"kubectl rollout status deployment/{service} -n {self.namespace} --timeout=30s")
             
             print(f"Injected ConfigMap drift fault for service: {service} - removed {key_to_remove}")
 
-
     def recover_configmap_drift(self, microservices: list[str]):
             
         for service in microservices:
+            # Use the same ConfigMap name as in injection
             configmap_name = f"{service}-config"
             
-            # Read the actual config.json from the running pod
-            read_config_cmd = f"kubectl exec deployment/profile -n {self.namespace} -- cat /go/src/github.com/harlow/go-micro-services/config.json 2>/dev/null || kubectl exec deployment/rate -n {self.namespace} -- cat /go/src/github.com/harlow/go-micro-services/config.json"
-            config_json_str = self.kubectl.exec_command(read_config_cmd)
-            original_config = json.loads(config_json_str)
-            print(f"Read original config from {service} pod")
+            # Read the saved original config instead of trying to read from the pod
+            original_config_path = f"/tmp/{service}-original-config.json"
+            with open(original_config_path, "r") as f:
+                original_config = json.load(f)
+            print(f"Read original config from saved file: {original_config_path}")
+
             
-            temp_config_path = f"/tmp/{service}-config-original.json"
-            with open(temp_config_path, "w") as f:
-                json.dump(original_config, f, indent=2)
-            
-            update_cm_cmd = f"kubectl create configmap {configmap_name} --from-file=config.json={temp_config_path} -n {self.namespace} --dry-run=client -o yaml | kubectl apply -f -"
+            original_config_json = json.dumps(original_config, indent=2)
+            update_cm_cmd = f"""kubectl create configmap {configmap_name} -n {self.namespace} --from-literal=config.json='{original_config_json}' --dry-run=client -o yaml | kubectl apply -f -"""
             self.kubectl.exec_command(update_cm_cmd)
-                
             print(f"Updated ConfigMap {configmap_name} with complete configuration")
             
             self.kubectl.exec_command(f"kubectl rollout restart deployment/{service} -n {self.namespace}")
             self.kubectl.exec_command(f"kubectl rollout status deployment/{service} -n {self.namespace} --timeout=30s")
             
             print(f"Recovered ConfigMap drift fault for service: {service}")
+
 
     ############# HELPER FUNCTIONS ################
     def _wait_for_pods_ready(self, microservices: list[str], timeout: int = 30):
@@ -865,6 +862,24 @@ class VirtualizationFaultInjector(FaultInjector):
             waited += sleep
 
         print(f"DNS policy propagation check for service '{service}' failed after {max_wait}s.")
+
+    def _get_configmap_name(self, service: str) -> tuple[str, list[str]]:
+        """Get the configmap name and key for a given service."""
+
+        if self.namespace == "test-hotel-reservation": # HotelReservation
+            svc_map = {
+                "mongodb-geo": ("mongo-geo-script", ["k8s-geo-mongo.sh"]),
+                "mongodb-rate": ("mongo-rate-script", ["k8s-rate-mongo.sh"]),
+            }
+        elif self.namespace == "test-social-network": # SocialNetwork
+            svc_map = {
+                "media-mongodb": ("media-mongodb", ["mongod.conf"]),
+                "user-mongodb": ("user-mongodb", ["mongod.conf"]),
+            }
+        else:
+            raise ValueError(f"Unsupported namespace: {self.namespace}")
+        
+        return svc_map[service]
 
 if __name__ == "__main__":
     namespace = "test-social-network"
