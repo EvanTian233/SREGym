@@ -1056,7 +1056,7 @@ class VirtualizationFaultInjector(FaultInjector):
 
         print(f"DNS policy propagation check for service '{service}' failed after {max_wait}s.")
     
-    def deploy_service(self, service_name: str, script_path: str):
+    def deploy_custom_service(self, service_name: str, script_path: str):
         print(f"Deploying {service_name} Service...................................")
         import tempfile
         import yaml
