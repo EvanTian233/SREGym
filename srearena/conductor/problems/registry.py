@@ -6,6 +6,7 @@ from srearena.conductor.problems.auth_miss_mongodb import MongoDBAuthMissing
 from srearena.conductor.problems.cart_service_failure import CartServiceFailure
 from srearena.conductor.problems.configmap_drift import ConfigMapDrift
 from srearena.conductor.problems.container_kill import ChaosMeshContainerKill
+from srearena.conductor.problems.duplicate_pvc_mounts import DuplicatePVCMounts
 from srearena.conductor.problems.env_variable_leak import EnvVariableLeak
 from srearena.conductor.problems.image_slow_load import ImageSlowLoad
 from srearena.conductor.problems.kafka_queue_problems import KafkaQueueProblems
@@ -31,12 +32,11 @@ from srearena.conductor.problems.service_dns_resolution_failure import ServiceDN
 from srearena.conductor.problems.sidecar_port_conflict import SidecarPortConflict
 from srearena.conductor.problems.stale_coredns_config import StaleCoreDNSConfig
 from srearena.conductor.problems.storage_user_unregistered import MongoDBUserUnregistered
+from srearena.conductor.problems.taint_no_toleration import TaintNoToleration
 from srearena.conductor.problems.target_port import K8STargetPortMisconfig
 from srearena.conductor.problems.wrong_bin_usage import WrongBinUsage
 from srearena.conductor.problems.wrong_dns_policy import WrongDNSPolicy
 from srearena.conductor.problems.wrong_service_selector import WrongServiceSelector
-from srearena.conductor.problems.taint_no_toleration import TaintNoToleration
-from srearena.conductor.problems.duplicate_pvc_mounts import DuplicatePVCMounts
 
 
 class ProblemRegistry:
@@ -152,13 +152,13 @@ class ProblemRegistry:
                 app_name="hotel_reservation"
             ),
             "duplicate_pvc_mounts_astronomy_shop": lambda: DuplicatePVCMounts(
-                app_name="astronomy_shop", faulty_service="cart"
+                app_name="astronomy_shop", faulty_service="frontend"
             ),
             "duplicate_pvc_mounts_social_network": lambda: DuplicatePVCMounts(
-                app_name="social_network", faulty_service="media-mongodb"
+                app_name="social_network", faulty_service="media-frontend"
             ),
             "duplicate_pvc_mounts_hotel_reservation": lambda: DuplicatePVCMounts(
-                app_name="hotel_reservation", faulty_service="mongodb-rate"
+                app_name="hotel_reservation", faulty_service="frontend"
             ),
             # "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
             # K8S operator misoperation -> Refactor later, not sure if they're working

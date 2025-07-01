@@ -1,9 +1,9 @@
 """Inject faults at the virtualization layer: K8S, Docker, etc."""
 
 import copy
-from pathlib import Path
 import json
 import time
+from pathlib import Path
 
 import yaml
 
@@ -693,6 +693,7 @@ class VirtualizationFaultInjector(FaultInjector):
             self.kubectl.wait_for_ready(self.namespace)
 
             print(f"Recovered from liveness probe too aggressive fault for service: {service}")
+
     # V.14 - Injects an environment variable leak by deleting a ConfigMap and restarting the associated deployment.
     def inject_env_variable_leak(self, microservices: list[str]):
         for microservice in microservices:
@@ -702,8 +703,8 @@ class VirtualizationFaultInjector(FaultInjector):
             elif self.namespace == "test-hotel-reservation":
                 configmap_name = "mongo-geo-script"
             else:
-                raise ValueError(f"Unknown namespace: {self.namespace}")  
-                          
+                raise ValueError(f"Unknown namespace: {self.namespace}")
+
             get_cmd = f"kubectl get configmap {configmap_name} -n {self.namespace} -o yaml"
             original_yaml = self.kubectl.exec_command(get_cmd)
             parsed_yaml = yaml.safe_load(original_yaml)
@@ -834,7 +835,7 @@ class VirtualizationFaultInjector(FaultInjector):
             self.kubectl.exec_command(f"kubectl rollout status deployment/{service} -n {self.namespace} --timeout=30s")
 
             print(f"Recovered ConfigMap drift fault for service: {service}")
-    
+
     # V.14 - Inject a readiness probe misconfiguration fault
     def inject_readiness_probe_misconfiguration(self, microservices: list[str]):
         for service in microservices:
@@ -843,7 +844,7 @@ class VirtualizationFaultInjector(FaultInjector):
             original_deployment_yaml = copy.deepcopy(deployment_yaml)
 
             containers = deployment_yaml["spec"]["template"]["spec"]["containers"]
-            
+
             initial_delay = 10
 
             for container in containers:
@@ -923,7 +924,6 @@ class VirtualizationFaultInjector(FaultInjector):
             # Save the *original* deployment YAML for recovery
             self._write_yaml_to_file(service, original_deployment_yaml)
 
-            
             print(f"Injected liveness probe misconfiguration fault for service: {service}")
 
     def recover_liveness_probe_misconfiguration(self, microservices: list[str]):
@@ -943,65 +943,49 @@ class VirtualizationFaultInjector(FaultInjector):
 
             print(f"Recovered from liveness probe misconfiguration fault for service: {service}")
 
-    # Duplicate PVC mounts: multiple replicas share ReadWriteOnce PVC causing mount conflict
+    # Duplicate PVC mounts multiple replicas share ReadWriteOnce PVC causing mount conflict
     def inject_duplicate_pvc_mounts(self, microservices: list[str]):
-        """Force multiple replicas of a *Deployment* to share the **same** ReadWriteOnce PVC so that the
-        second pod becomes stuck in Pending / ContainerCreating. This reproduces the duplicate-mount fault.
-        """
         for service in microservices:
 
-            # 1. Fetch current Deployment manifest
             deployment_yaml = self._get_deployment_yaml(service)
             original_yaml = copy.deepcopy(deployment_yaml)
 
-            # 2. Create a single PVC that every replica will try to use
+            # Create a single PVC that every replica will try to use
             pvc_name = f"{service}-pvc"
             pvc_manifest = {
                 "apiVersion": "v1",
                 "kind": "PersistentVolumeClaim",
-                "metadata": {
-                    "name": pvc_name,
-                    "namespace": self.namespace
-                },
-                "spec": {
-                    "accessModes": ["ReadWriteOnce"],
-                    "resources": {
-                        "requests": {
-                            "storage": "1Gi"
-                        }
-                    }
-                }
+                "metadata": {"name": pvc_name, "namespace": self.namespace},
+                "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "1Gi"}}},
             }
-        
-            # Apply the PVC
+
             pvc_json = json.dumps(pvc_manifest)
             self.kubectl.exec_command(f"kubectl apply -f - <<EOF\n{pvc_json}\nEOF")
 
-
             print(f"Created PVC {pvc_name} for fault injection")
 
-            # 3. Patch the pod template so **all** replicas mount that same claim
             pod_spec = deployment_yaml.get("spec", {}).get("template", {}).get("spec", {})
 
-            # Add the shared volume
             if "volumes" not in pod_spec:
                 pod_spec["volumes"] = []
-            pod_spec["volumes"].append({
-                "name": f"{service}-volume",
-                "persistentVolumeClaim": {"claimName": pvc_name},
-            })
+            pod_spec["volumes"].append(
+                {
+                    "name": f"{service}-volume",
+                    "persistentVolumeClaim": {"claimName": pvc_name},
+                }
+            )
 
-            # Mount the volume in the first container
             containers = pod_spec.get("containers", [])
             if containers:
                 if "volumeMounts" not in containers[0]:
                     containers[0]["volumeMounts"] = []
-                containers[0]["volumeMounts"].append({
-                    "name": f"{service}-volume",
-                    "mountPath": f"/{service}-data",
-                })
+                containers[0]["volumeMounts"].append(
+                    {
+                        "name": f"{service}-volume",
+                        "mountPath": f"/{service}-data",
+                    }
+                )
 
-            # 4. Add podAntiAffinity so replicas land on different nodes (required for the RWO conflict)
             if "affinity" not in pod_spec:
                 pod_spec["affinity"] = {}
 
@@ -1012,34 +996,30 @@ class VirtualizationFaultInjector(FaultInjector):
                 "requiredDuringSchedulingIgnoredDuringExecution": [
                     {
                         "labelSelector": {
-                            "matchExpressions": [
-                                {"key": label_key, "operator": "In", "values": [label_val]}
-                            ]
+                            "matchExpressions": [{"key": label_key, "operator": "In", "values": [label_val]}]
                         },
                         "topologyKey": "kubernetes.io/hostname",
                     }
                 ]
             }
 
-            # 5. Ensure at least two replicas
+            # Ensure at least two replicas
             deployment_yaml["spec"]["replicas"] = max(deployment_yaml["spec"].get("replicas", 1), 2)
 
-            # 6. Apply the modified Deployment
             yaml_path = self._write_yaml_to_file(service, deployment_yaml)
 
             self.kubectl.exec_command(f"kubectl delete deployment {service} -n {self.namespace}")
             self.kubectl.exec_command(f"kubectl apply -f {yaml_path} -n {self.namespace}")
 
-            # 7. Save the original manifest for completeness (not used, but handy)
-            self._write_yaml_to_file(f"{service}-original", original_yaml)
-
-            print(f"Injected Duplicate PVC Mounts fault for {service}: replicas={deployment_yaml['spec']['replicas']}, shared PVC={pvc_name}")
+            print(
+                f"Injected Duplicate PVC Mounts fault for {service}: replicas={deployment_yaml['spec']['replicas']}, shared PVC={pvc_name}"
+            )
 
     def recover_duplicate_pvc_mounts(self, microservices: list[str]):
         for service in microservices:
 
             deployment_yaml = self._get_deployment_yaml(service)
-            
+
             self.kubectl.exec_command(f"kubectl delete deployment {service} -n {self.namespace}")
 
             template = deployment_yaml["spec"]["template"]
@@ -1053,20 +1033,16 @@ class VirtualizationFaultInjector(FaultInjector):
                 if "volumeMounts" not in pod_spec["containers"][0]:
                     pod_spec["containers"][0]["volumeMounts"] = []
 
-                pod_spec["containers"][0]["volumeMounts"] = [
-                    {
-                        "name": "data-volume",
-                        "mountPath": f"/{service}-data"
-                    }
-                ]
+                pod_spec["containers"][0]["volumeMounts"] = [{"name": "data-volume", "mountPath": f"/{service}-data"}]
 
+            # Convert Deployment to StatefulSet
             statefulset_yaml = {
                 "apiVersion": "apps/v1",
                 "kind": "StatefulSet",
                 "metadata": {
                     "name": service,
                     "namespace": self.namespace,
-                    "labels": deployment_yaml.get("metadata", {}).get("labels", {})
+                    "labels": deployment_yaml.get("metadata", {}).get("labels", {}),
                 },
                 "spec": {
                     "serviceName": service,
@@ -1075,27 +1051,25 @@ class VirtualizationFaultInjector(FaultInjector):
                     "template": template,
                     "volumeClaimTemplates": [
                         {
-                            "metadata": {
-                                "name": "data-volume",
-                                "namespace": self.namespace
-                            },
+                            "metadata": {"name": "data-volume", "namespace": self.namespace},
                             "spec": {
                                 "accessModes": ["ReadWriteOnce"],
                                 "resources": {"requests": {"storage": "1Gi"}},
-                            }
+                            },
                         }
-                    ]
-                }
+                    ],
+                },
             }
 
             ss_path = self._write_yaml_to_file(service, statefulset_yaml)
             self.kubectl.exec_command(f"kubectl apply -f {ss_path} -n {self.namespace}")
 
             self.kubectl.exec_command(
-                f"kubectl rollout status statefulset/{service} -n {self.namespace} --timeout=120s")
+                f"kubectl rollout status statefulset/{service} -n {self.namespace} --timeout=120s"
+            )
 
             print(f"Converted {service} to StatefulSet with unique PVC per replica and scaled to {replicas}")
-    
+
     ############# HELPER FUNCTIONS ################
     def _wait_for_pods_ready(self, microservices: list[str], timeout: int = 30):
         for service in microservices:
@@ -1208,10 +1182,11 @@ class VirtualizationFaultInjector(FaultInjector):
             waited += sleep
 
         print(f"DNS policy propagation check for service '{service}' failed after {max_wait}s.")
-    
+
     def deploy_custom_service(self, service_name: str, script_path: str):
         print(f"Deploying {service_name} Service...................................")
         import tempfile
+
         import yaml
 
         with open(script_path, "r") as sf:
@@ -1229,9 +1204,7 @@ class VirtualizationFaultInjector(FaultInjector):
             "data": {script_filename: script_body},
         }
 
-        self.kubectl.exec_command(
-            f"kubectl apply -f - <<'CM'\n{yaml.dump(configmap)}\nCM"
-        )
+        self.kubectl.exec_command(f"kubectl apply -f - <<'CM'\n{yaml.dump(configmap)}\nCM")
 
         deployment = {
             "apiVersion": "apps/v1",
@@ -1274,7 +1247,7 @@ class VirtualizationFaultInjector(FaultInjector):
                                 "name": "script-vol",
                                 "configMap": {"name": f"{service_name}-script"},
                             }
-                        ]
+                        ],
                     },
                 },
             },
@@ -1308,7 +1281,7 @@ class VirtualizationFaultInjector(FaultInjector):
 
         self.kubectl.exec_command(f"kubectl apply -f {tmp_path}")
         self.kubectl.wait_for_ready(namespace=self.namespace)
-        
+
         print(f"Deployed {service_name} Service...................................")
 
     def inject_toleration_without_matching_taint(
@@ -1320,17 +1293,12 @@ class VirtualizationFaultInjector(FaultInjector):
         effect: str = "NoSchedule",
     ):
 
-        self.kubectl.exec_command(
-            f"kubectl taint node {node_name} {taint_key}={taint_value}:{effect} --overwrite"
-        )
+        self.kubectl.exec_command(f"kubectl taint node {node_name} {taint_key}={taint_value}:{effect} --overwrite")
         print(f"Tainted node {node_name} with {taint_key}={taint_value}:{effect}")
 
         for svc in microservices:
-            self.kubectl.exec_command(
-                f"kubectl delete pod -l app={svc} -n {self.namespace}"
-            )
+            self.kubectl.exec_command(f"kubectl delete pod -l app={svc} -n {self.namespace}")
         print(f"Deleted pods for {microservices}; they should now be unschedulable.")
-
 
     def recover_toleration_without_matching_taint(
         self,
@@ -1341,17 +1309,14 @@ class VirtualizationFaultInjector(FaultInjector):
         effect: str = "NoSchedule",
     ):
 
-        self.kubectl.exec_command(
-            f"kubectl taint node {node_name} {taint_key}={taint_value}:{effect}-"
-        )
+        self.kubectl.exec_command(f"kubectl taint node {node_name} {taint_key}={taint_value}:{effect}-")
         print(f"Removed taint from node {node_name}")
 
         for svc in microservices:
-            self.kubectl.exec_command(
-                f"kubectl rollout restart deployment {svc} -n {self.namespace}"
-            )
+            self.kubectl.exec_command(f"kubectl rollout restart deployment {svc} -n {self.namespace}")
         self.kubectl.wait_for_stable(self.namespace)
         print(f"Pods for {microservices} are back to Running")
+
 
 if __name__ == "__main__":
     namespace = "test-social-network"

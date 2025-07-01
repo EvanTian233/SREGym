@@ -57,4 +57,4 @@ class DuplicatePVCMounts(Problem):
             fault_type="duplicate_pvc_mounts",
             microservices=[self.faulty_service],
         )
-        print(f"Service: {self.faulty_service} | Namespace: {self.namespace}\n") 
+        print(f"Service: {self.faulty_service} | Namespace: {self.namespace}\n")
