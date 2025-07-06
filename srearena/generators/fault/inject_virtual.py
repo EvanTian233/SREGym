@@ -1120,7 +1120,6 @@ class VirtualizationFaultInjector(FaultInjector):
             
             modified_yaml_path = self._write_yaml_to_file(service, deployment_yaml)
             
-            # Delete and reapply the deployment
             delete_command = f"kubectl delete deployment {service} -n {self.namespace}"
             apply_command = f"kubectl apply -f {modified_yaml_path} -n {self.namespace}"
             
@@ -1136,7 +1135,6 @@ class VirtualizationFaultInjector(FaultInjector):
             print(f"Injected environment variable shadowing fault for service: {service}")
 
     def recover_env_variable_shadowing(self, microservices: list[str]):
-        """Recover from environment variable shadowing fault by restoring original deployment."""
         for service in microservices:
             original_yaml_path = f"/tmp/{service}_modified.yaml"
             
