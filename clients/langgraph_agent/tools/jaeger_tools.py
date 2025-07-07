@@ -51,7 +51,7 @@ async def get_traces(
     server_name = "observability"
     if USE_HTTP:
         logger.info("Using HTTP, connecting to server.")
-        server_url = "http://127.0.0.1:9953/sse"
+        server_url = "http://127.0.0.1:8000/sse"
         http_transport = await exit_stack.enter_async_context(sse_client(url=server_url))
         session = await exit_stack.enter_async_context(ClientSession(*http_transport))
     else:

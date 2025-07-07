@@ -29,6 +29,7 @@ class BasicToolNode:
             if self.is_async:
                 tool_call["args"].update({"state": inputs})
                 tool_result = asyncio.run(self.tools_by_name[tool_call["name"]].ainvoke(tool_call))
+                tool_call["args"].pop("state", None)
             else:
                 tool_result = self.tools_by_name[tool_call["name"]].invoke(tool_call["args"])
             logger.info(f"tool_result: {tool_result}")
