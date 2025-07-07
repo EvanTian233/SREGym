@@ -44,7 +44,8 @@ class ExecKubectlCmdSafely(BaseTool):
     ) -> str:
         logger.info(f"calling mcp exec_kubectl_cmd_safely from "
                     f"langchain exec_kubectl_cmd_safely, with command: \"{command}\"")
-        result = await self._client.call_tool("exec_kubectl_cmd_safely", arguments={"cmd": command})
+        async with self._client:
+            result = await self._client.call_tool("exec_kubectl_cmd_safely", arguments={"cmd": command})
         text_result = "\n".join([part.text for part in result])
         return text_result
 
@@ -73,7 +74,8 @@ class RollbackCommand(BaseTool):
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
         logger.info(f"calling langchain rollback_command")
-        result = await self._client.call_tool("rollback_command")
+        async with self._client:
+            result = await self._client.call_tool("rollback_command")
         text_result = "\n".join([part.text for part in result])
         return text_result
 
@@ -105,6 +107,7 @@ class GetPreviousRollbackabelCmd(BaseTool):
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
         logger.info(f"calling langchain get_previous_rollbackabel_cmd")
-        result = await self._client.call_tool("get_previous_rollbackabel_cmd")
+        async with self._client:
+            result = await self._client.call_tool("get_previous_rollbackabel_cmd")
         text_result = "\n".join([part.text for part in result])
         return text_result

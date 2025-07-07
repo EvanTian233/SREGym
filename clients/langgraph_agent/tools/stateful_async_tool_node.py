@@ -18,7 +18,7 @@ class StatefulAsyncToolNode:
         self.client = client
         self.is_session_established = False
 
-    async def _async_call(self, inputs: dict):
+    def __call__(self, inputs: dict):
         if messages := inputs.get("messages", []):
             message = messages[-1]
         else:
@@ -26,20 +26,16 @@ class StatefulAsyncToolNode:
         logger.info(f"StatefulAsyncToolNode: {message}")
         outputs = []
         logger.info(f"tool node connection is {'' if self.is_session_established else 'not '}established.")
-        async with self.client:
-            for tool_call in message.tool_calls:
-                logger.info(f"invoking tool: {tool_call['name']}, tool_call: {tool_call}")
-                tool_result = await self.tools_by_name[tool_call["name"]].ainvoke(tool_call.get('args', {}))
-                logger.info(f"tool_result: {tool_result}")
-                outputs.append(
-                    ToolMessage(
-                        content=tool_result,
-                        name=tool_call["name"],
-                        tool_call_id=tool_call["id"],
-                    )
+        for tool_call in message.tool_calls:
+            logger.info(f"invoking tool: {tool_call['name']}, tool_call: {tool_call}")
+            tool_result = asyncio.run(self.tools_by_name[tool_call["name"]].ainvoke(tool_call.get('args', {})))
+            logger.info(f"tool_result: {tool_result}")
+            outputs.append(
+                ToolMessage(
+                    content=tool_result,
+                    name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
                 )
+            )
 
-            return {"messages": outputs}
-
-    def __call__(self, inputs: dict):
-        return asyncio.run(self._async_call(inputs))
+        return {"messages": outputs}
