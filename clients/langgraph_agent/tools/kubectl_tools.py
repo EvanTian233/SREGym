@@ -50,6 +50,76 @@ class ExecKubectlCmdSafely(BaseTool):
         return text_result
 
 
+kubectl_read_only_cmds = [
+    "kubectl api-resources",
+    "kubectl api-version",
+    # read only if not interactive (interactive commands are prohibited)
+    "kubectl attach",
+    "kubectl auth can-i",
+    "kubectl cluster-info",
+    "kubectl describe",
+    "kubectl diff",
+    "kubectl events",
+    "kubectl explain",
+    "kubectl get",
+    "kubectl logs",
+    "kubectl options",
+    "kubectl top",
+    "kubectl version",
+    "kubectl config view",
+    "kubectl config current-context",
+    "kubectl config get",
+]
+
+
+class ExecReadOnlyKubectlCmdInput(BaseModel):
+    command: str = Field(description=f'The read-only kubectl command you want to execute in a CLI '
+                                     'to manage a k8s cluster. It should start with "kubectl". '
+                                     f'Available Read-only Commands: {kubectl_read_only_cmds}')
+
+
+class ExecReadOnlyKubectlCmd(BaseTool):
+    name: str = "exec_read_only_kubectl_cmd"
+    description: str = "this is a tool used to execute read-only kubectl commands."
+    args_schema: Optional[ArgsSchema] = ExecReadOnlyKubectlCmdInput
+
+    _client: Client = PrivateAttr()
+
+    def __init__(self, client: Client, **kwargs: Any):
+        super().__init__(**kwargs)
+        self._client = client
+
+    def _run(
+        self,
+        command: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> str:
+        logger.error("no sync version of tools, exiting.")
+        sys.exit(1)
+
+    async def _arun(
+        self,
+        command: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> str:
+        is_read_only = False
+        for c in kubectl_read_only_cmds:
+            if command.startswith(c):
+                is_read_only = True
+                break
+        if not is_read_only:
+            logger.info(f"Agent is trying to exec a non read-only command {command} with tool {self.name}")
+            return f"Your command {command} is not a read-only kubectl command. " \
+                   f"Available Read-only Commands: {kubectl_read_only_cmds}."
+
+        logger.info(f"calling mcp exec_kubectl_cmd_safely from "
+                    f"langchain {self.name}, with command: \"{command}\"")
+        async with self._client:
+            result = await self._client.call_tool("exec_kubectl_cmd_safely", arguments={"cmd": command})
+        text_result = "\n".join([part.text for part in result])
+        return text_result
+
+
 class RollbackCommand(BaseTool):
     name: str = "rollback_command"
     description: str = "Use this function to roll back the last kubectl command " \
