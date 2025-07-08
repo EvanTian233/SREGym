@@ -189,6 +189,7 @@ class XAgent:
             "messages": output,
             "curr_file": state["curr_file"],
             "curr_line": state["curr_line"],
+            "workdir": state["workdir"],
         }
 
     # this is the agent node. it simply queries the llm and return the results
@@ -198,6 +199,7 @@ class XAgent:
             "messages": [self.llm.inference(messages=state["messages"], tools=self.all_tools)],
             "curr_file": state["curr_file"],
             "curr_line": state["curr_line"],
+            "workdir": state["workdir"],
         }
 
     def build_agent(self, mock: bool = False):
