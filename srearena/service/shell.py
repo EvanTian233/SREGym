@@ -48,7 +48,7 @@ class Shell:
                 return error_message
             else:
                 output_message = out.stdout.decode("utf-8")
-                print(output_message)
+                # print(output_message)
                 return output_message
 
         except Exception as e:
@@ -71,7 +71,7 @@ class Shell:
                 return error_message
             else:
                 output_message = stdout.read().decode("utf-8")
-                print(output_message)
+                # print(output_message)
                 return output_message
 
         except Exception as e:
