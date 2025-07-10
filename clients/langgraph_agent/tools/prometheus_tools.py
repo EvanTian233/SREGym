@@ -33,45 +33,46 @@ logger = logging.getLogger(__name__)
 
 
 @tool("get_metrics", description="Get metrics from Prometheus using a query")
-
-async def get_metrics(query:str,
-                      state: Annotated[dict, InjectedState] = None,
-    tool_call_id: Annotated[str, InjectedToolCallId] = "",) -> Command:
-    """ Get metrics from Prometheus using a query."""
+async def get_metrics(
+    query: str,
+    state: Annotated[dict, InjectedState] = None,
+    tool_call_id: Annotated[str, InjectedToolCallId] = "",
+) -> Command:
+    """Get metrics from Prometheus using a query."""
     logger.info(f"get_metrics called with query: {query}")
     logger.info("Calling MCP get_metrics from langchain get_metrics")
     exit_stack = AsyncExitStack()
     server_name = "prometheus"
     if USE_HTTP:
-            logger.info("Using HTTP, connecting to server.")
-           #server_url = "http://127.0.0.1:9953/sse"
-            server_url = "http://127.0.0.1:8000/sse"
-            # Register both the SSE client and session with an async exit stack so they will automatically clean up when you're done (e.g. close connections properly
+        logger.info("Using HTTP, connecting to server.")
+        # server_url = "http://127.0.0.1:9953/sse"
+        server_url = "http://127.0.0.1:8000/sse"
+        # Register both the SSE client and session with an async exit stack so they will automatically clean up when you're done (e.g. close connections properly
 
-            # opens the actual communication channel to the MCP server
-            # Connect to the SSE stream
-            # Wrap that connection in a ClientSession so you can call MCP tools
-            # Automatically clean up everything when the async block finishes
-            http_transport = await exit_stack.enter_async_context(sse_client(url=server_url))
-            session = await exit_stack.enter_async_context(ClientSession(*http_transport))
+        # opens the actual communication channel to the MCP server
+        # Connect to the SSE stream
+        # Wrap that connection in a ClientSession so you can call MCP tools
+        # Automatically clean up everything when the async block finishes
+        http_transport = await exit_stack.enter_async_context(sse_client(url=server_url))
+        session = await exit_stack.enter_async_context(ClientSession(*http_transport))
     else:
-            server_path = f"{os.getcwd()}/mcp_server/prometheus_server.py"
-            logger.info(f"Connecting to server: {server_name} at path: {server_path}")
-            is_python = server_path.endswith(".py")
-            is_js = server_path.endswith(".js")
-            if not (is_python or is_js):
-                raise ValueError("Server path must be a Python or JavaScript file.")
-            command = sys.executable if is_python else "node"
-            server_parameters = StdioServerParameters(
-                command=command,
-                args=[server_path],
-                server_name=server_name,
-                is_python=is_python,
-                is_js=is_js,
-            )
-            stdio_transport = await exit_stack.enter_async_context(stdio_client(server_parameters))
-            stdio, write = stdio_transport
-            session = await exit_stack.enter_async_context(ClientSession(*stdio_transport))
+        server_path = f"{os.getcwd()}/mcp_server/prometheus_server.py"
+        logger.info(f"Connecting to server: {server_name} at path: {server_path}")
+        is_python = server_path.endswith(".py")
+        is_js = server_path.endswith(".js")
+        if not (is_python or is_js):
+            raise ValueError("Server path must be a Python or JavaScript file.")
+        command = sys.executable if is_python else "node"
+        server_parameters = StdioServerParameters(
+            command=command,
+            args=[server_path],
+            server_name=server_name,
+            is_python=is_python,
+            is_js=is_js,
+        )
+        stdio_transport = await exit_stack.enter_async_context(stdio_client(server_parameters))
+        stdio, write = stdio_transport
+        session = await exit_stack.enter_async_context(ClientSession(*stdio_transport))
     await session.initialize()
     logger.info("Session created, calling get_metrics tool.")
     # Makes a request to the MCP server to get available tools
@@ -80,30 +81,31 @@ async def get_metrics(query:str,
     tools = response.tools
     logger.info(f"Available tools: {tools}")
     if not tools:
-         raise ValueError("No tools found in session.")
+        raise ValueError("No tools found in session.")
     result = await session.call_tool(
         "get_metrics",
         arguments={
-          "query": query,
-      },)
+            "query": query,
+        },
+    )
     logger.info(f"Result: {result}")
     metrics = result.content[0].text
     logger.info(f"Metrics received: {metrics}")
     await exit_stack.aclose()
 
-    if USE_SUMMARIES: 
+    if USE_SUMMARIES:
         metrics = _summarize_metrics(result)
         logger.info(f"Summary: {metrics}")
-        
-    
-    return Command( update= update_file_vars_in_state(state, ToolMessage(content= metrics,
-                                                                          tool_call_id=tool_call_id)),)
+
+    return Command(
+        update=update_file_vars_in_state(state, ToolMessage(content=metrics, tool_call_id=tool_call_id)),
+    )
 
 
 def _summarize_metrics(metrics):
-        logger.info("=== _summarize_metrics called ===")
+    logger.info("=== _summarize_metrics called ===")
 
-        system_prompt = """
+    system_prompt = """
 You are an expert Site Reliability Engineering tool. You are given raw microservice metrics as JSON dictionaries.
 
 Your task:
@@ -129,15 +131,15 @@ Raw metrics:
 If you do not have enough data to determine root cause, state 'Insufficient data to determine root cause' and provide raw metrics.
 """
 
-        logger.info(f"raw metrics received: {metrics}")
-        llm = get_llm_backend_for_tools()
-        # then use this `llm` for inference
-        messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=metrics.content[0].text),
-        ]
+    logger.info(f"raw metrics received: {metrics}")
+    llm = get_llm_backend_for_tools()
+    # then use this `llm` for inference
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=metrics.content[0].text),
+    ]
 
-        metrics_summary =  llm.inference(messages=messages)
-        #metrics_summary = llm.inference(messages=metrics.content[0].text, system_prompt=system_prompt)
-        logger.info(f"Metrics summary: {metrics_summary}")
-        return metrics_summary
+    metrics_summary = llm.inference(messages=messages)
+    # metrics_summary = llm.inference(messages=metrics.content[0].text, system_prompt=system_prompt)
+    logger.info(f"Metrics summary: {metrics_summary}")
+    return metrics_summary

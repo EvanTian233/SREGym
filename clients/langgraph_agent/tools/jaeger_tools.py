@@ -26,8 +26,8 @@ from clients.langgraph_agent.tools.text_editing.windowed_file import (  # type: 
     WindowedFile,
 )
 
-USE_HTTP = True 
-USE_SUMMARIES = True # Set to False to use local server
+USE_HTTP = True
+USE_SUMMARIES = True  # Set to False to use local server
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -88,12 +88,12 @@ async def get_traces(
         logger.info(f"Traces summary: {traces}")
     else:
         logger.info("Not using summaries, using raw traces data.")
-        
+
     return Command(
         update=update_file_vars_in_state(
             state,
             ToolMessage(
-                content= traces,
+                content=traces,
                 tool_call_id=tool_call_id,
             ),
         )
@@ -124,8 +124,9 @@ def _summarize_traces(traces):
     ]
 
     traces_summary = llm.inference(messages=messages)
-    #logger.info(f"Traces summary: {traces_summary}")
+    # logger.info(f"Traces summary: {traces_summary}")
     return traces_summary
+
 
 def _summarize_operations(operations):
     logger.info("=== _summarize_operations called ===")
@@ -287,7 +288,7 @@ async def get_operations(
     await exit_stack.aclose()
     operations = result.content[0].text
     logger.info(f"Result from get_operations: {operations}")
-    if USE_SUMMARIES: 
+    if USE_SUMMARIES:
         logger.info("Using summaries for operations.")
         operations = _summarize_operations(result)
         logger.info(f"Operations summaries: {operations}")
