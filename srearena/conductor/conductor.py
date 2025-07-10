@@ -34,6 +34,10 @@ class Conductor:
         self.submission_stage = None  # "noop", "detection", "localization", "mitigation", "done"
         self.results = {}
 
+        self.strict_detection_mode = False  # With strict detection as True, if the agent doesn't
+        # get the anomaly detection correct, it cannot advance to
+        # later stages.
+
     def dependency_check(self, binaries: list[str]):
         for binary in binaries:
             if shutil.which(binary) is None:
@@ -87,19 +91,28 @@ class Conductor:
 
             self.results["TTD"] = time.time() - self.execution_start_time
 
-            if not results.get("success", False):
-                self.submission_stage = "done"
-                return "[❌] Incorrect detection. Ending evaluation."
-
             if self.problem.localization_oracle:
                 self.submission_stage = "localization"
             elif self.problem.mitigation_oracle:
                 self.submission_stage = "mitigation"
             else:
                 self.submission_stage = "done"
-                return "[✅] Detection successful. No further stages to evaluate."
 
-            return SubmissionStatus.VALID_SUBMISSION
+            if self.strict_detection_mode:
+                if not results.get("success", False):
+                    self.submission_stage = "done"
+                    return "[❌] Incorrect detection. Ending evaluation."
+
+            if results.get("success", False):
+                if self.submission_stage == "done":
+                    return "[✅] Detection successful. No further stages to evaluate."
+                else:
+                    return "[✅] Detection successful. Proceeding to next stage..."
+            else:
+                if self.submission_stage == "done":
+                    return "[❌] Incorrect detection. No further stages to evaluate."
+                else:
+                    return "[❌] Incorrect detection. Proceeding anyway..."
 
         elif self.submission_stage == "localization":
             if not self.problem.localization_oracle:
