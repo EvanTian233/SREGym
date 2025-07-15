@@ -86,14 +86,14 @@ except KeyError:
 try:
     WATSONX_API_BASE = os.environ["WATSONX_API_BASE"]
 except KeyError:
-    WATSONX_API_BASE = ""
+    WATSONX_API_BASE = "https://us-south.ml.cloud.ibm.com"
     print(f"Unable to find environment variable - WATSONX_API_BASE. Setting to {WATSONX_API_BASE}.")
 
 try:
     WATSONX_API_KEY = os.environ["WATSONX_API_KEY"]
 except KeyError:
-    WATSONX_API_KEY = ""
-    print(f"Unable to find environment variable - WATSONX_API_KEY. Setting to {WATSONX_API_KEY}.")
+    print(f"Unable to find environment variable - WATSONX_API_KEY. Exiting...")
+    exit(1)
 
 try:
     THINKING_BUDGET_TOOLS = int(os.environ["THINKING_BUDGET_TOOLS"])
