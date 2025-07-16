@@ -214,15 +214,14 @@ class XAgent:
         """ Check if summaries are needed based on the number of messages."""
         messages = state["messages"]
         logger.info("Checking if summaries are needed, current messages: %s", messages)
-        # If there are more than 5 messages, we summarize
         logger.info("Number of messages: %d", len(messages))
 
-        if len(messages) >= 9 and len(messages) % 9 == 0:
-            logger.info("Summaries are needed, multiple of 9 messages.")
+        if len(messages) -1 >=10  and (len(messages) - 1 )% 10 == 0:
+            logger.info("Summaries are needed, multiple of 10 messages.")
             return True
         else:
             logger.info("No summaries needed")
-            logger.info("Number of messages: %d", len(messages))
+            logger.info("Number of messages: %d", len(messages) - 1)
 
 
             return False
@@ -230,7 +229,7 @@ class XAgent:
     
     def summarize_messages(self, state: State):
         """ Summarize the messages in the conversation history."""
-        messages = [msg for msg in state["messages"] if not (isinstance(msg, AIMessage) and msg.additional_kwargs.get("is_summary"))][-9:]
+        messages = [msg for msg in state["messages"] if not (isinstance(msg, AIMessage) and msg.additional_kwargs.get("is_summary"))][-(int(os.environ["SUMMARY_FREQUENCY"])-1):]
         def format_messages(msgs):
             formatted = ""
             for msg in msgs:
@@ -307,7 +306,7 @@ Conversation:
 # Append the actual last AI answer at the end
         formatted_summary = "\n".join(formatted_summary_lines + [f"\nAnswer: {answer}"])
     
-        summary_message = AIMessage(
+        summary_message = HumanMessage(
             content=formatted_summary,
             additional_kwargs={"is_summary": True})             
         logger.info("Produced Summary: %s", formatted_summary)
