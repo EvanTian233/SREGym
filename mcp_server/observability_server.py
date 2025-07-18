@@ -1,12 +1,8 @@
 import logging
 from datetime import datetime, timedelta
 
-import uvicorn
 from fastmcp import FastMCP
-from fastmcp.server.http import create_sse_app
-from prometheus_server import mcp as prometheus_mcp
-from starlette.applications import Starlette
-from starlette.routing import Mount
+
 from utils import ObservabilityClient
 
 logger = logging.getLogger("Observability MCP Server")
@@ -100,14 +96,3 @@ def get_traces(service: str, last_n_minutes: int) -> str:
         err_str = f"[ob_mcp] Error querying get_traces: {str(e)}"
         logger.error(err_str)
         return err_str
-
-
-if __name__ == "__main__":
-    app = Starlette(
-        routes=[
-            Mount("/jaeger", app=create_sse_app(mcp, "/messages/", "/sse")),
-            Mount("/prometheus", app=create_sse_app(prometheus_mcp, "/messages/", "/sse")),
-        ]
-    )
-
-    uvicorn.run(app, host="127.0.0.1", port=8000)

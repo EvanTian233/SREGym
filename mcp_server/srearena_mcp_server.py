@@ -1,4 +1,6 @@
 from kubectl_mcp_tools import kubectl_mcp
+from prometheus_server import mcp as prometheus_mcp
+from observability_server import mcp as observability_mcp
 import uvicorn
 from starlette.applications import Starlette
 from starlette.routing import Mount
@@ -11,6 +13,8 @@ logger = logging.getLogger(__name__)
 app = Starlette(
     routes=[
         Mount('/kubectl_mcp_tools', app=create_sse_app(kubectl_mcp, "/messages/", "/sse")),
+        Mount("/jaeger", app=create_sse_app(observability_mcp, "/messages/", "/sse")),
+        Mount("/prometheus", app=create_sse_app(prometheus_mcp, "/messages/", "/sse")),
     ]
 )
 
