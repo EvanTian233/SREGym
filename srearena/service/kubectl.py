@@ -88,7 +88,7 @@ class KubeCtl:
         try:
             self.get_deployment(service, namespace)
             return True
-        except ApiException:
+        except ApiException as e:
             if e.status == 404:
                 return False
             else:

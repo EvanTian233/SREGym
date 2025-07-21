@@ -12,7 +12,7 @@ from srearena.service.helm import Helm
 class AppRegistry:
     def __init__(self):
         self.APP_REGISTRY = {
-            "OpenTelemetry Demo Astronomy Shop": AstronomyShop,
+            # "OpenTelemetry Demo Astronomy Shop": AstronomyShop,
             "Flight Ticket": FlightTicket,
             "Hotel Reservation": HotelReservation,
             "Social Network": SocialNetwork,
@@ -20,7 +20,7 @@ class AppRegistry:
         }
 
         self.APP_PATH = {
-            "OpenTelemetry Demo Astronomy Shop": ASTRONOMY_SHOP_METADATA,
+            # "OpenTelemetry Demo Astronomy Shop": ASTRONOMY_SHOP_METADATA,
             "Flight Ticket": FLIGHT_TICKET_METADATA,
             "Hotel Reservation": HOTEL_RES_METADATA,
             "Social Network": SOCIAL_NETWORK_METADATA,
