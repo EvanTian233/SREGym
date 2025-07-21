@@ -148,7 +148,7 @@ class ApplicationFaultInjector(FaultInjector):
                 self.kubectl.update_deployment(service, self.namespace, deployment)
 
     # A4. valkey_auth_disruption: Invalidate the password in valkey so dependent services cannot work
-    def inject_valkey_auth_disruption(self, target_service="cartservice"):
+    def inject_valkey_auth_disruption(self, target_service="cart"):
         pods = self.kubectl.list_pods(self.namespace)
         valkey_pods = [p.metadata.name for p in pods.items if "valkey-cart" in p.metadata.name]
         if not valkey_pods:
@@ -165,7 +165,7 @@ class ApplicationFaultInjector(FaultInjector):
         self.kubectl.exec_command(f"kubectl delete pod -l app.kubernetes.io/name={target_service} -n {self.namespace}")
         time.sleep(3)
 
-    def recover_valkey_auth_disruption(self, target_service="cartservice"):
+    def recover_valkey_auth_disruption(self, target_service="cart"):
         pods = self.kubectl.list_pods(self.namespace)
         valkey_pods = [p.metadata.name for p in pods.items if "valkey-cart" in p.metadata.name]
         if not valkey_pods:
