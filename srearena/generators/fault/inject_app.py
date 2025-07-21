@@ -1,6 +1,10 @@
 """Inject faults at the application layer: Code, MongoDB, Redis, etc."""
 
+import base64
+import textwrap
 import time
+
+from kubernetes import client
 
 from srearena.generators.fault.base import FaultInjector
 from srearena.service.kubectl import KubeCtl
@@ -147,7 +151,7 @@ class ApplicationFaultInjector(FaultInjector):
                         container.image = f"yinfangchen/hotelreservation:latest"
                 self.kubectl.update_deployment(service, self.namespace, deployment)
 
-    # A4. valkey_auth_disruption: Invalidate the password in valkey so dependent services cannot work
+    # A.4 valkey_auth_disruption: Invalidate the password in valkey so dependent services cannot work
     def inject_valkey_auth_disruption(self, target_service="cart"):
         pods = self.kubectl.list_pods(self.namespace)
         valkey_pods = [p.metadata.name for p in pods.items if "valkey-cart" in p.metadata.name]
@@ -181,6 +185,83 @@ class ApplicationFaultInjector(FaultInjector):
         # Restart cartservice to restore normal behavior
         self.kubectl.exec_command(f"kubectl delete pod -l app.kubernetes.io/name={target_service} -n {self.namespace}")
         time.sleep(3)
+
+    # A.5 valkey_memory disruption: Write large 10MB payloads to the valkey store making it go into OOM state
+    def inject_valkey_memory_disruption(self):
+        print("Injecting Valkey memory disruption via in-cluster job...")
+
+        script = textwrap.dedent(
+            """
+            import redis
+            import threading
+            import time
+
+            def flood_redis():
+                client = redis.Redis(host='valkey-cart', port=6379)
+                while True:
+                    try:
+                        payload = 'x' * 1000000
+                        client.set(f"key_{time.time()}", payload)
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        time.sleep(1)
+
+            threads = []
+            for _ in range(10):
+                t = threading.Thread(target=flood_redis)
+                t.start()
+                threads.append(t)
+
+            for t in threads:
+                t.join()
+        """
+        ).strip()
+
+        encoded_script = base64.b64encode(script.encode()).decode()
+
+        job_spec = {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {
+                "name": "valkey-memory-flood",
+                "namespace": self.namespace,
+            },
+            "spec": {
+                "template": {
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "containers": [
+                            {
+                                "name": "flooder",
+                                "image": "python:3.10-slim",
+                                "command": [
+                                    "sh",
+                                    "-c",
+                                    f"pip install redis && python3 -c \"import base64; exec(base64.b64decode('{encoded_script}'))\"",
+                                ],
+                            }
+                        ],
+                    }
+                }
+            },
+        }
+
+        batch_v1 = client.BatchV1Api()
+        batch_v1.create_namespaced_job(namespace=self.namespace, body=job_spec)
+        print("Valkey memory flood job submitted.")
+
+    def recover_valkey_memory_disruption(self):
+        print("Cleaning up Valkey memory flood job...")
+        batch_v1 = client.BatchV1Api()
+        try:
+            batch_v1.delete_namespaced_job(
+                name="valkey-memory-flood",
+                namespace=self.namespace,
+                propagation_policy="Foreground",
+            )
+            print("Job deleted.")
+        except Exception as e:
+            print(f"Error deleting job: {e}")
 
 
 if __name__ == "__main__":

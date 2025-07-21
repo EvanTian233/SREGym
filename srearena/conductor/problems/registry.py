@@ -39,6 +39,7 @@ from srearena.conductor.problems.storage_user_unregistered import MongoDBUserUnr
 from srearena.conductor.problems.taint_no_toleration import TaintNoToleration
 from srearena.conductor.problems.target_port import K8STargetPortMisconfig
 from srearena.conductor.problems.valkey_auth_disruption import ValkeyAuthDisruption
+from srearena.conductor.problems.valkey_memory_disruption import ValkeyMemoryDisruption
 from srearena.conductor.problems.wrong_bin_usage import WrongBinUsage
 from srearena.conductor.problems.wrong_dns_policy import WrongDNSPolicy
 from srearena.conductor.problems.wrong_service_selector import WrongServiceSelector
@@ -177,6 +178,7 @@ class ProblemRegistry:
                 path="/api", correct_service="frontend-service", wrong_service="recommendation-service"
             ),
             "valkey_auth_disruption": ValkeyAuthDisruption,
+            "valkey_memory_disruption": ValkeyMemoryDisruption,
             # "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
             # K8S operator misoperation -> Refactor later, not sure if they're working
             # They will also need to be updated to the new problem format.
