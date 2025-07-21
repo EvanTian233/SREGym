@@ -56,7 +56,7 @@ class SymptomFaultInjector(FaultInjector):
     def recover_pod_failure(self):
         self.delete_chaos_experiment("pod-failure")
 
-    def inject_pod_failure(self, microservices: List[str], duration: str = "200s"):
+    def inject_pod_failure(self, microservices: List[str]):
         """
         Inject a pod failure fault.
         """
@@ -67,7 +67,6 @@ class SymptomFaultInjector(FaultInjector):
             "spec": {
                 "action": "pod-failure",
                 "mode": "one",
-                "duration": duration,
                 "selector": {"labelSelectors": {"io.kompose.service": ", ".join(microservices)}},
             },
         }
@@ -77,7 +76,7 @@ class SymptomFaultInjector(FaultInjector):
     def recover_network_loss(self):
         self.delete_chaos_experiment("network-loss")
 
-    def inject_network_loss(self, microservices: List[str], duration: str = "200s"):
+    def inject_network_loss(self, microservices: List[str]):
         """
         Inject a network loss fault.
         """
@@ -88,7 +87,6 @@ class SymptomFaultInjector(FaultInjector):
             "spec": {
                 "action": "loss",
                 "mode": "one",
-                "duration": duration,
                 "selector": {
                     "namespaces": [self.namespace],
                     "labelSelectors": {"io.kompose.service": ", ".join(microservices)},
@@ -110,7 +108,6 @@ class SymptomFaultInjector(FaultInjector):
             "spec": {
                 "action": "container-kill",
                 "mode": "one",
-                "duration": "200s",
                 "selector": {"labelSelectors": {"io.kompose.service": microservice}},
                 "containerNames": (containers if isinstance(containers, list) else [containers]),
             },
@@ -124,7 +121,6 @@ class SymptomFaultInjector(FaultInjector):
     def inject_network_delay(
         self,
         microservices: List[str],
-        duration: str = "200s",
         latency: str = "10s",
         jitter: str = "0ms",
     ):
@@ -133,7 +129,6 @@ class SymptomFaultInjector(FaultInjector):
 
         Args:
             microservices (List[str]): A list of microservice names or labels to target.
-            duration (str): The duration of the network delay.
             latency (str): The amount of delay to introduce.
             jitter (str): The jitter for the delay.
         """
@@ -144,7 +139,6 @@ class SymptomFaultInjector(FaultInjector):
             "spec": {
                 "action": "delay",
                 "mode": "one",
-                "duration": duration,
                 "selector": {"labelSelectors": {"io.kompose.service": ", ".join(microservices)}},
                 "delay": {"latency": latency, "correlation": "100", "jitter": jitter},
             },
@@ -200,13 +194,12 @@ class SymptomFaultInjector(FaultInjector):
         """
         self.delete_chaos_experiment(f"network-partition-{from_service}-to-{to_service}")
 
-    def inject_pod_kill(self, microservices: List[str], duration: str = "200s"):
+    def inject_pod_kill(self, microservices: List[str]):
         """
         Inject a pod kill fault targeting specified microservices by label in the configured namespace.
 
         Args:
             microservices (List[str]): A list of microservices labels to target for the pod kill experiment.
-            duration (str): The duration for which the pod kill fault should be active.
         """
         chaos_experiment = {
             "apiVersion": "chaos-mesh.org/v1alpha1",
@@ -215,7 +208,6 @@ class SymptomFaultInjector(FaultInjector):
             "spec": {
                 "action": "pod-kill",
                 "mode": "one",
-                "duration": duration,
                 "selector": {"labelSelectors": {"io.kompose.service": ", ".join(microservices)}},
             },
         }
