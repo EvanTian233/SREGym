@@ -477,25 +477,19 @@ class SymptomFaultInjector(FaultInjector):
         # Inject Chaos Mesh JVM Heap Stress
         chaos_spec = {
             "apiVersion": "chaos-mesh.org/v1alpha1",
-            "kind": "Schedule",
+            "kind": "JVMChaos",
             "metadata": {
-                "name": f"schedule-jvmheapstress-{deployment_name}",
+                "name": f"jvmheapstress-{deployment_name}",
                 "namespace": self.namespace,
             },
             "spec": {
-                "schedule": "* * * * *",
-                "historyLimit": 1,
-                "concurrencyPolicy": "Forbid",
-                "type": "JVMChaos",
-                "jvmChaos": {
-                    "mode": "all",
-                    "selector": {
-                        "namespaces": [self.namespace],
-                        "labelSelectors": {"app.kubernetes.io/component": component_label},
-                    },
-                    "action": "stress",
-                    "memType": "heap",
+                "mode": "all",
+                "selector": {
+                    "namespaces": [self.namespace],
+                    "labelSelectors": {"app.kubernetes.io/component": component_label},
                 },
+                "action": "stress",
+                "memType": "heap",
             },
         }
 
