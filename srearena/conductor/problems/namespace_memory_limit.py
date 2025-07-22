@@ -2,7 +2,7 @@ from srearena.conductor.oracles.localization import LocalizationOracle
 from srearena.conductor.oracles.namespace_memory_limit_mitigation import NamespaceMemoryLimitMitigationOracle
 from srearena.conductor.problems.base import Problem
 from srearena.generators.fault.inject_virtual import VirtualizationFaultInjector
-from srearena.service.apps.hotelres import HotelReservation
+from srearena.service.apps.hotel_reservation import HotelReservation
 from srearena.service.kubectl import KubeCtl
 from srearena.utils.decorators import mark_fault_injected
 
