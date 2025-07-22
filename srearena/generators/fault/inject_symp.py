@@ -503,6 +503,80 @@ class SymptomFaultInjector(FaultInjector):
         self.kubectl.exec_command(f"kubectl apply -f {tmp_yaml} -n {self.namespace}")
         os.system(f"rm -f {tmp_yaml}")
 
+    def inject_jvm_return_fault(self, deployment_name: str = "ad", component_label: str = "ad"):
+        """
+        Modify return value of a method in the JVM using Chaos Mesh.
+        """
+        # Get current deployment info
+        deployment = self.kubectl.get_deployment(deployment_name, self.namespace)
+        container = deployment.spec.template.spec.containers[0]
+        container_name = container.name
+        env_vars = container.env or []
+
+        # Update JAVA_TOOL_OPTIONS
+        java_tool_value = "-XX:+EnableDynamicAgentLoading -javaagent:/usr/src/app/opentelemetry-javaagent.jar"
+        updated = False
+        updated_env = []
+
+        for env in env_vars:
+            if env.name == "JAVA_TOOL_OPTIONS":
+                env.value = java_tool_value
+                updated = True
+            updated_env.append(env)
+
+        if not updated:
+            updated_env.append(client.V1EnvVar(name="JAVA_TOOL_OPTIONS", value=java_tool_value))
+
+        # Patch the deployment with updated env vars
+        patch_body = {
+            "spec": {
+                "template": {
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": container_name,
+                                "env": [e.to_dict() for e in updated_env],
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        self.kubectl.patch_deployment(deployment_name, self.namespace, patch_body)
+
+        # Inject Chaos Mesh JVM Return Rule
+        chaos_spec = {
+            "apiVersion": "chaos-mesh.org/v1alpha1",
+            "kind": "JVMChaos",
+            "metadata": {
+                "name": f"jvmreturn-{deployment_name}",
+                "namespace": self.namespace,
+            },
+            "spec": {
+                "action": "ruleData",
+                "ruleData": (
+                    "RULE modifyReturnValue\n"
+                    "CLASS AdService\n"
+                    "METHOD getInstance\n"
+                    "AT ENTRY\n"
+                    "IF true\n"
+                    "DO return null\n"
+                    "ENDRULE"
+                ),
+                "mode": "all",
+                "selector": {
+                    "namespaces": [self.namespace],
+                    "labelSelectors": {"app.kubernetes.io/component": component_label},
+                },
+            },
+        }
+
+        self.create_chaos_experiment(chaos_spec, f"jvmreturn-{deployment_name}")
+
+    def recover_jvm_return_fault(self, deployment_name: str = "ad"):
+        self.delete_chaos_experiment(f"jvmreturn-{deployment_name}")
+
 
 if __name__ == "__main__":
     namespace = "test-hotel-reservation"
