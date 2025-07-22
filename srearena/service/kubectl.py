@@ -195,6 +195,12 @@ class KubeCtl:
             print(f"Exception when patching service: {e}\n")
             return None
 
+    def patch_custom_object(self, group, version, namespace, plural, name, body):
+        """Patch a custom Kubernetes object (e.g., Chaos Mesh CRD)."""
+        return self.custom_api.patch_namespaced_custom_object(
+            group=group, version=version, namespace=namespace, plural=plural, name=name, body=body
+        )
+
     def create_configmap(self, name, namespace, data):
         """Create or update a configmap from a dictionary of data."""
         try:
