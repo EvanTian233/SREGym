@@ -2,8 +2,8 @@ import json
 
 from srearena.service.apps.astronomy_shop import AstronomyShop
 from srearena.service.apps.flight_ticket import FlightTicket
-from srearena.service.apps.hotelres import HotelReservation
-from srearena.service.apps.socialnet import SocialNetwork
+from srearena.service.apps.hotel_reservation import HotelReservation
+from srearena.service.apps.social_network import SocialNetwork
 # from srearena.service.apps.train_ticket import TrainTicket
 
 from srearena.paths import *
