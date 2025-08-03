@@ -36,13 +36,15 @@ class TaintNoToleration(Problem):
         """Return the name of the first node that is *not* control-plane."""
         nodes = self.kubectl.core_v1_api.list_node().items
         for n in nodes:
-            name = n.metadata.name
-            if "control-plane" not in name and "master" not in name:
-                return name
+            # Check if the node has the control-plane label
+            labels = n.metadata.labels or {}
+            if "node-role.kubernetes.io/control-plane" not in labels:
+                return n.metadata.name
         return nodes[0].metadata.name
 
     @mark_fault_injected
     def inject_fault(self):
+        print(f"Injecting Fault to Service {self.faulty_service} on Node {self.faulty_node}")
         self.kubectl.exec_command(f"kubectl taint node {self.faulty_node} sre-fault=blocked:NoSchedule --overwrite")
 
         patch = """[{"op": "add", "path": "/spec/template/spec/tolerations",
