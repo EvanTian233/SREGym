@@ -37,6 +37,8 @@ async def submit_solution(req: SubmitRequest):
 async def get_status():
     if _conductor is None:
         raise HTTPException(400, "No problem has been started")
+    if _conductor.submission_stage == "noop":  # Do not reveal noop to agent
+        return {"stage": "detection"}
     return {"stage": _conductor.submission_stage}
 
 
