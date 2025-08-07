@@ -3,14 +3,60 @@ import logging
 import subprocess
 import socket
 import time
+
+from langchain_core.messages import AIMessage, HumanMessage
+
+from clients.langgraph_agent.stratus_agent.rollback_agent import RollbackAgent
+from clients.weak_oracles.stratus_agent_oracles import StratusAgentOracles
 from srearena.conductor import Conductor
 from srearena.utils.critical_section import CriticalSection
 from clients.langgraph_agent.stratus_agent.base_agent import BaseAgent
 from clients.langgraph_agent.llm_backend.init_backend import get_llm_backend_for_tools
-from clients.configs.stratus_config import get_diagnosis_agent_cfg, get_mitigation_agent_cfg
+from clients.configs.stratus_config import get_diagnosis_agent_cfg, get_mitigation_rollback_agent_cfg
+from stratus_agent_demo_cfg import StratusAgentDemoCfg
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def get_last_n_reflections_str(reflections_list, n):
+
+    if not reflections_list:
+        return "No reflections available as this is the first attempt."
+
+    # Get the last `n` reflections
+    last_reflections = reflections_list[-n:][::-1]
+
+    # Concatenate with appropriate words
+    return f"Reflections from last {len(last_reflections)} attempts in reverse order:\n" + \
+        "\n\n".join(last_reflections)
+
+
+def generate_reflection(messages, llm):
+    thoughts = [
+        msg.content for msg in messages
+        if isinstance(msg, AIMessage) and msg.additional_kwargs.get("is_thought", False)
+    ]
+
+    if len(thoughts) == 0:
+        return ""
+
+    thought_str = "\n".join(thoughts)
+    human_prompt = f"{thought_str}\n\n" \
+                   f"You are tasked with analyzing the content provided above. " \
+                   f"These are the thought history of the last run of the agent. " \
+                   f"Please extract the root cause and the mitigation plan only. " \
+                   f"Please pay more attention to the latter part of the content " \
+                   f"because it contains the most important information. Because " \
+                   f"they are the most recent, the most relevant, and the most " \
+                   f"essential. Do not summarize the content. The root cause and the " \
+                   f"mitigation plan is the only thing you need to extract."
+    new_message = [HumanMessage(content=human_prompt)]
+
+    response = llm.inference(messages=new_message)
+    assert isinstance(response, AIMessage), f"Should return a single AIMessage but returned {type(response)}"
+
+    return response.content
 
 
 def wait_for_port(port, host="127.0.0.1", timeout=10):
@@ -107,7 +153,7 @@ if __name__ == "__main__":
 
     # # Phase 1: NO OP
     # final_state = diagnosis_agent.run({"app_summary": problem.app.get_app_summary()})
-    # logger.info(f"Final state: {final_state}")
+    # logger.info(f"Noop diagnosis final state: {final_state}")
     # if 'detection' in final_state['ans'] and isinstance(final_state['ans']['detection'], bool):
     #     print(f"NO OP Detection Result: {'✅' if not final_state['ans']['detection'] else '❌'}")
     # else:
@@ -121,28 +167,59 @@ if __name__ == "__main__":
 
     # Phase 3: Faulty system
     final_state = diagnosis_agent.run({"app_summary": problem.app.get_app_summary()})
-    logger.info(f"Final state: {final_state}")
+    logger.info(f"Normal diagnosis final state: {final_state}")
     if 'detection' in final_state['ans'] and isinstance(final_state['ans']['detection'], bool):
         print(f"Faulty Result: {'✅' if final_state['ans']['detection'] else '❌'}")
     else:
         print(f"Faulty Result: '❌'; Invalid answer provided by the agent!")
 
     # mitigation
-    mitigation_agent_cfg = get_mitigation_agent_cfg()
+    # NOTE: The mitigation agent and rollback agent share the same session and thus their tools have consistent states.
+    mitigation_agent_cfg, rollback_agent_cfg = get_mitigation_rollback_agent_cfg()
     mitigation_agent = BaseAgent(llm, mitigation_agent_cfg.model_copy(update={"max_round": 10}))
     mitigation_agent.build_agent()
+
+    rollback_agent = RollbackAgent(llm, rollback_agent_cfg.model_copy(update={"max_round": 10}))
+    rollback_agent.build_agent()
 
     faults_info = "The diagnosis_agent failed to give summarization."
     if 'summarization' in final_state['ans'] and isinstance(final_state['ans']['summarization'], str):
         faults_info = final_state["ans"]['summarization']
 
-    final_state = mitigation_agent.run({
-        "app_summary": problem.app.get_app_summary(),
-        "faults_info": faults_info
-    })
-    logger.info(f"Final state: {final_state}")
+    # retry logic
+    stratus_agent_oracles = StratusAgentOracles(problem.namespace)
+    reflections = []
+    last_result = {}
+    retry_cnt = 0
 
-    problem.mitigation_oracle.evaluate()
+    while True:
+        final_state = mitigation_agent.run({
+            "app_summary": problem.app.get_app_summary(),
+            "faults_info": faults_info,
+            "reflection": get_last_n_reflections_str(reflections, StratusAgentDemoCfg.last_n_round_reflections),
+            "last_result": str(last_result) if last_result else "No previous result"
+        })
+        logger.info(f"Mitigation final state: {final_state}")
+        # Wait before evaluation to let the system stabilize
+        time.sleep(StratusAgentDemoCfg.time_to_wait_before_evaluation)
+
+        result = stratus_agent_oracles.validate()
+        logger.info(f"Mitigation self validation result: "
+                    f"{'✅' if result['success'] else '❌'} {result}")
+
+        if result["success"] or \
+                not StratusAgentDemoCfg.is_retry_enabled or \
+                retry_cnt >= StratusAgentDemoCfg.max_retry_count:
+            break
+        logger.info("Mitigation failed, retrying...")
+        retry_cnt += 1
+        logger.info(f"Rollback final state: {rollback_agent.run({})}")
+        last_result = result
+        reflections.append(generate_reflection(final_state['messages'], llm))
+
+    # Final evaluation
+    result = problem.mitigation_oracle.evaluate()
+    logger.info(f"Final evaluation result: {result}")
 
     # Final cleanup
     with CriticalSection():

@@ -201,7 +201,10 @@ class GetPreviousRollbackableCmd(BaseTool):
         logger.info(f"calling langchain get_previous_rollbackable_cmd")
         async with self._client:
             result = await self._client.call_tool("get_previous_rollbackable_cmd")
-        text_result = "\n".join([part.text for part in result])
+        if len(result) == 0:
+            text_result = "There is no previous rollbackable command."
+        else:
+            text_result = "\n".join([part.text for part in result])
         return Command(
             update={
                 "messages": [

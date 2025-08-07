@@ -73,6 +73,9 @@ class KubeCtl:
                 if i + 1 < len(command_parts):
                     namespace = command_parts[i + 1]
                     break
+            elif part.startswith("--namespace="):
+                namespace = part.split("=")[1]
+                break
         return namespace
 
     @staticmethod

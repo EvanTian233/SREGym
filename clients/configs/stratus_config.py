@@ -29,22 +29,24 @@ logger = logging.getLogger(__name__)
 
 parent_dir = Path(__file__).resolve().parent
 
+load_dotenv()
+
 
 class BaseAgentCfg(BaseModel):
     max_round: int = Field(
-        default=20,
+        default=int(os.environ["MAX_ROUND"]),
         description="maximum rounds allowed for tool calling",
         gt=0
     )
 
     max_rec_round: int = Field(
-        default=3,
+        default=int(os.environ["MAX_REC_ROUND"]),
         description="maximum rounds allowed for submission rectification",
         gt=0
     )
 
     max_tool_call_one_round: int = Field(
-        default=5,
+        default=int(os.environ["MAX_TOOL_CALL_ONE_ROUND"]),
         description="maximum number of tool_calls allowed in one round",
         gt=0
     )
@@ -84,9 +86,6 @@ class BaseAgentCfg(BaseModel):
         return v
 
 
-load_dotenv()
-
-
 def get_diagnosis_agent_cfg():
     client = get_client()
 
@@ -111,21 +110,25 @@ def get_client():
     return client
 
 
-def get_mitigation_agent_cfg():
+def get_mitigation_rollback_agent_cfg():
     client = get_client()
-
-    exec_read_only_kubectl_cmd = ExecReadOnlyKubectlCmd(client)
+    # Initialize tools
     exec_kubectl_cmd_safely = ExecKubectlCmdSafely(client)
     rollback_command = RollbackCommand(client)
     get_previous_rollbackable_cmd = GetPreviousRollbackableCmd(client)
+
     mitigation_agent_cfg = BaseAgentCfg(
         prompts_file_path=str(parent_dir / "stratus_mitigation_agent_prompts.yaml"),
         sync_tools=[submit_tool, wait_tool],
         async_tools=[get_traces, get_services,
                      get_operations, get_metrics,
-                     exec_read_only_kubectl_cmd,
-                     exec_kubectl_cmd_safely,
-                     rollback_command,
+                     exec_kubectl_cmd_safely],
+    )
+
+    rollback_agent_cfg = BaseAgentCfg(
+        prompts_file_path=str(parent_dir / "stratus_rollback_agent_prompts.yaml"),
+        sync_tools=[submit_tool],
+        async_tools=[rollback_command,
                      get_previous_rollbackable_cmd],
     )
-    return mitigation_agent_cfg
+    return mitigation_agent_cfg, rollback_agent_cfg

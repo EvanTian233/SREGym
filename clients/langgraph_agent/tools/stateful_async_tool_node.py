@@ -12,7 +12,6 @@ class StatefulAsyncToolNode:
 
     def __init__(self, node_tools: list[BaseTool]) -> None:
         self.tools_by_name = {t.name: t for t in node_tools}
-        print(f"CHUANWEI_TOOLS: {self.tools_by_name}")
 
     def __call__(self, inputs: dict):
         if messages := inputs.get("messages", []):

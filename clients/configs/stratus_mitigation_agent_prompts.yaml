@@ -30,9 +30,16 @@ user: >
   If you exceed this limitation, the system will force to end the conversation and you will be considered failing the tasks.
   You should minimize the number of interaction rounds while ensuring task completion.
   
-  The following is the information of the identified faults in the app:
+  The following is the information of faults identified by a diagnosis agent in the app:
   
   {faults_info}
+  
+  The result from the last attempt of mitigation is as follows:
+  {last_result}
+  
+  There are some reflections from the previous run:
+  
+  {reflection}
   
   Next, use the provided tools to mitigate the faults.
   It is a good habit to verify the information of faults first before you take any actions for mitigation.

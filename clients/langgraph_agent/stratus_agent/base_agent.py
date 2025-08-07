@@ -41,6 +41,7 @@ class BaseAgent:
                                             "the tools you mentioned must be available to you at first. "
                                             "You should not call any tools in this stage; ")
         ai_message = self.llm_inference_step(state["messages"] + [human_prompt])
+        ai_message.additional_kwargs["is_thought"] = True
         new_messages = [human_prompt, ai_message]
         for tool_call in ai_message.tool_calls:
             tool_call_message = ToolMessage(
@@ -74,7 +75,7 @@ class BaseAgent:
                 state["rec_submission_rounds"] > self.max_rec_round:
             return END
         else:
-            return "explanation_agent"
+            return "next_round"
 
     def check_if_summaries_needed(self, state: State):
         """ Check if summaries are needed based on the number of messages."""
@@ -250,7 +251,7 @@ Conversation:
         self.graph_builder.add_conditional_edges(
             "post_tool_hook",
             self.post_tool_route,
-            {"explanation_agent": "explanation_agent", END: END},
+            {"next_round": "explanation_agent", END: END},
         )
 
         self.graph = self.graph_builder.compile()
