@@ -66,18 +66,18 @@ class Conductor:
         self.submission_stage = "noop"
         print("✅ Environment ready—now POST /submit to grade NO-OP detection.")
 
-    async def ask_env(self, wrapped_cmd: str):
+    async def submit(self, wrapped_cmd: str) -> dict:
         """
-        Called by CLI or HTTP /submit.  Parses & grades the `submit(...)` call,
+        Called by CLI or HTTP /submit. Parses & grades the `submit(...)` call,
         advances submission_stage, records results—and when we hit “done”,
-        triggers undeploy_app (which also tears down infra if nothing else is live).
+        triggers undeploy_app. Returns the current results dict.
         """
         from srearena.conductor.parser import ResponseParser
 
         parser = ResponseParser()
         parsed = parser.parse(wrapped_cmd)
         if parsed["api_name"] != "submit":
-            return "[❌] Only `submit(...)` is supported."
+            raise ValueError("Only `submit(...)` is supported.")
         sol = parsed["args"][0] if parsed["args"] else None
 
         # NO-OP
@@ -85,7 +85,7 @@ class Conductor:
             r = self.detection_oracle.evaluate(sol)
             self.results["NOOP Detection"] = r
             if r.get("reason") == "Invalid Format":
-                return "[⚠️] Invalid NO-OP format."
+                return dict(self.results)
 
             # inject fault
             with CriticalSection():
@@ -93,7 +93,7 @@ class Conductor:
                 atexit.register(self.exit_cleanup_and_recover_fault)
 
             self.submission_stage = "detection"
-            return "[✅] NO-OP passed — fault injected. Now submit detection."
+            return dict(self.results)
 
         # DETECTION
         if self.submission_stage == "detection":
@@ -103,14 +103,13 @@ class Conductor:
 
             if self.problem.localization_oracle:
                 self.submission_stage = "localization"
-                return "[✅] Detection recorded — now submit localization."
             elif self.problem.mitigation_oracle:
                 self.submission_stage = "mitigation"
-                return "[✅] Detection recorded — now submit mitigation."
             else:
                 self.submission_stage = "done"
                 self.undeploy_app()
-                return "[✅] Detection recorded — all done."
+
+            return dict(self.results)
 
         # LOCALIZATION
         if self.submission_stage == "localization":
@@ -120,11 +119,11 @@ class Conductor:
 
             if self.problem.mitigation_oracle:
                 self.submission_stage = "mitigation"
-                return "[✅] Localization recorded — now submit mitigation."
             else:
                 self.submission_stage = "done"
                 self.undeploy_app()
-                return "[✅] Localization recorded — all done."
+
+            return dict(self.results)
 
         # MITIGATION
         if self.submission_stage == "mitigation":
@@ -134,32 +133,27 @@ class Conductor:
 
             self.submission_stage = "done"
             self.undeploy_app()
-            return "[✅] Mitigation recorded — all done."
+            return dict(self.results)
 
-        return "[✅] All stages completed."
+        # any other case
+        return dict(self.results)
 
     def deploy_app(self):
-        """
-        Kubectl + Prometheus + problem.app deployment.
-        """
-        print("Setting up metrics-server...")
+        """Kubectl + Prometheus + problem.app deployment."""
+        print("Setting up metrics-server…")
         self.kubectl.exec_command(
-            "kubectl apply -f "
-            "https://github.com/kubernetes-sigs/metrics-server/"
-            "releases/latest/download/components.yaml"
+            "kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml"
         )
         self.kubectl.exec_command(
             "kubectl -n kube-system patch deployment metrics-server "
             "--type=json -p='["
-            '{"op":"add","path":"/spec/template/spec/containers/0/args/-",'
-            '"value":"--kubelet-insecure-tls"},'
-            '{"op":"add","path":"/spec/template/spec/containers/0/args/-",'
-            '"value":"--kubelet-preferred-address-types=InternalIP"}'
+            '{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},'
+            '{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-preferred-address-types=InternalIP"}'
             "]'"
         )
         self.kubectl.wait_for_ready("kube-system")
 
-        print("Setting up OpenEBS...")
+        print("Setting up OpenEBS…")
         self.kubectl.exec_command("kubectl apply -f https://openebs.github.io/charts/openebs-operator.yaml")
         self.kubectl.exec_command(
             "kubectl patch storageclass openebs-hostpath "
@@ -167,10 +161,10 @@ class Conductor:
         )
         self.kubectl.wait_for_ready("openebs")
 
-        print("Deploying Prometheus...")
+        print("Deploying Prometheus…")
         self.prometheus.deploy()
 
-        print("Deploying and starting workload...")
+        print("Deploying and starting workload…")
         self.problem.app.delete()
         self.problem.app.deploy()
         self.problem.app.start_workload()
@@ -178,6 +172,7 @@ class Conductor:
     def undeploy_app(self):
         """Teardown problem.app and, if no other apps running, OpenEBS/Prometheus."""
         self.problem.app.cleanup()
+        self.kubectl.wait_for_namespace_deletion(self.problem.app.namespace)
         deployed = self.get_deployed_apps()
         if not deployed:
             self.prometheus.teardown()
@@ -186,9 +181,6 @@ class Conductor:
             self.kubectl.wait_for_namespace_deletion("openebs")
 
     def get_deployed_apps(self) -> list[str]:
-        """
-        Used by CLI 'list' to show which apps are live.
-        """
         live = []
         for name in self.apps.get_app_names():
             meta = self.apps.get_app_metadata(name)
@@ -198,14 +190,13 @@ class Conductor:
         return live
 
     def exit_cleanup_and_recover_fault(self):
-        """Called on SIGINT or atexit to reset the cluster."""
+        """Cleanup on SIGINT or atexit."""
         try:
             if self.problem:
                 self.problem.recover_fault()
                 self.problem.app.cleanup()
         except (JSONDecodeError, RuntimeError):
             pass
-
         # always teardown infra if nothing else is running
         self.prometheus.teardown()
         self.kubectl.exec_command("kubectl delete sc openebs-hostpath openebs-device --ignore-not-found")

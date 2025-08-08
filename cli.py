@@ -109,10 +109,9 @@ class HumanAgent:
                 env = out
                 continue
 
-            # submit(...) -> call ask_env
             wrapped = f"```\n{text}\n```"
             try:
-                resp = await self.conductor.ask_env(wrapped)
+                resp = await self.conductor.submit(wrapped)
             except Exception as e:
                 env = f"[❌] Grading error: {e}"
             else:
