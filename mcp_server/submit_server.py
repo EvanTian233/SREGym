@@ -1,0 +1,38 @@
+import json
+import logging
+import urllib
+from datetime import datetime, timedelta
+
+import requests
+from fastmcp import FastMCP
+
+logger = logging.getLogger("Submission MCP Server")
+logger.info("Starting Submission MCP Server")
+mcp = FastMCP("Submission MCP Server")
+
+
+@mcp.tool(name="submit")
+def submit(ans: str) -> str:
+    """Submit task result to benchmark
+
+    Args:
+        ans (str): task result that the agent submits
+
+    Returns:
+        str: http return code of benchmark submission server
+    """
+
+    logger.info("[submit_mcp] submit mcp called")
+    # FIXME: reference url from config file, remove hard coding
+    url = "http://localhost:8000/submit"
+    headers = {"Content-Type": "application/json"}
+    # Match curl behavior: send "\"yes\"" when ans is "yes"
+    payload = {"solution": f'"{ans}"'}
+
+    try:
+        response = requests.post("http://localhost:8000/submit", json=payload, headers=headers)
+        logger.info(f"[submit_mcp] Response status: {response.status_code}, text: {response.text}")
+        return str(response.status_code)
+    except Exception as e:
+        logger.error(f"[submit_mcp] HTTP submission failed: {e}")
+        return "error"
