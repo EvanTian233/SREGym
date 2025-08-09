@@ -1,8 +1,5 @@
-import atexit
 import shutil
-import threading
 import time
-from contextlib import nullcontext
 from json.decoder import JSONDecodeError
 
 from srearena.conductor.oracles.detection import DetectionOracle
@@ -10,8 +7,6 @@ from srearena.conductor.problems.registry import ProblemRegistry
 from srearena.service.apps.registry import AppRegistry
 from srearena.service.kubectl import KubeCtl
 from srearena.service.telemetry.prometheus import Prometheus
-from srearena.utils.critical_section import CriticalSection
-from srearena.utils.sigint_aware_section import SigintAwareSection
 
 
 class Conductor:
@@ -53,14 +48,11 @@ class Conductor:
         self.detection_oracle = DetectionOracle(self.problem)
         self.results = {}
 
-        # Only install SIGINT handler in main thread
-        ctx = SigintAwareSection() if threading.current_thread() is threading.main_thread() else nullcontext()
-
         # 1) Environment setup
         self.dependency_check(["kubectl", "helm"])
-        with ctx:
-            print(f"[Session Start] Problem ID: {self.problem_id}")
-            self.deploy_app()
+        print(f"[Session Start] Problem ID: {self.problem_id}")
+        self.undeploy_app()  # Cleanup any leftovers
+        self.deploy_app()
 
         # 2) Ready for NO-OP detection
         self.submission_stage = "noop"
@@ -87,10 +79,7 @@ class Conductor:
             if r.get("reason") == "Invalid Format":
                 return dict(self.results)
 
-            # inject fault
-            with CriticalSection():
-                self.problem.inject_fault()
-                atexit.register(self.exit_cleanup_and_recover_fault)
+            self.problem.inject_fault()
 
             self.submission_stage = "detection"
             return dict(self.results)
@@ -105,7 +94,6 @@ class Conductor:
             if not self.problem.localization_oracle and not self.problem.mitigation_oracle:
                 self.submission_stage = "done"
                 snapshot = dict(self.results)
-                self.undeploy_app()
                 return snapshot
 
             # otherwise advance
@@ -123,7 +111,6 @@ class Conductor:
 
             if not self.problem.mitigation_oracle:
                 snapshot = dict(self.results)
-                self.undeploy_app()
                 self.submission_stage = "done"
                 return snapshot
 
@@ -137,7 +124,6 @@ class Conductor:
             self.results["TTM"] = time.time() - self.execution_start_time
 
             snapshot = dict(self.results)
-            self.undeploy_app()
             self.submission_stage = "done"
             return snapshot
 
@@ -176,35 +162,9 @@ class Conductor:
 
     def undeploy_app(self):
         """Teardown problem.app and, if no other apps running, OpenEBS/Prometheus."""
-        self.problem.app.cleanup()
-        deployed = self.get_deployed_apps()
-        if not deployed:
-            self.prometheus.teardown()
-            self.kubectl.exec_command("kubectl delete sc openebs-hostpath openebs-device --ignore-not-found")
-            self.kubectl.exec_command("kubectl delete -f https://openebs.github.io/charts/openebs-operator.yaml")
-            self.kubectl.wait_for_namespace_deletion("openebs")
-
-    def get_deployed_apps(self) -> list[str]:
-        live = []
-        for name in self.apps.get_app_names():
-            meta = self.apps.get_app_metadata(name)
-            ns = meta["Namespace"]
-            if self.kubectl.get_namespace_deployment_status(ns):
-                live.append(name)
-        return live
-
-    def exit_cleanup_and_recover_fault(self):
-        """Cleanup on SIGINT or atexit."""
-        try:
-            if self.problem:
-                self.problem.recover_fault()
-                self.problem.app.cleanup()
-        except (JSONDecodeError, RuntimeError):
-            pass
+        if self.problem:
+            self.problem.app.cleanup()
         self.prometheus.teardown()
         self.kubectl.exec_command("kubectl delete sc openebs-hostpath openebs-device --ignore-not-found")
         self.kubectl.exec_command("kubectl delete -f https://openebs.github.io/charts/openebs-operator.yaml")
-
-
-def exit_cleanup_fault(conductor):
-    conductor.exit_cleanup_and_recover_fault()
+        self.kubectl.wait_for_namespace_deletion("openebs")
