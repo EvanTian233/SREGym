@@ -6,17 +6,18 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 
+# FIXME: name of class is misleading for now
 class LanggraphToolConfig(BaseModel):
-    mcp_prometheus: str = Field(
+    prometheus_mcp_url: str = Field(
         description="url for prometheus mcp server", default=f"{os.environ['MCP_SERVER_URL']}/prometheus/sse"
     )
-    mcp_observability: str = Field(
-        description="url for observability mcp server", default=f"{os.environ['MCP_SERVER_URL']}/jaeger/sse"
+    jaeger_mcp_url: str = Field(
+        description="url for jaeger mcp server", default=f"{os.environ['MCP_SERVER_URL']}/jaeger/sse"
     )
-    mcp_kubectl: str = Field(
+    kubectl_mcp_url: str = Field(
         description="url for kubectl mcp server", default=f"{os.environ['MCP_SERVER_URL']}/kubectl_mcp_tools/sse"
     )
-    mcp_submit: str = Field(
+    submit_mcp_url: str = Field(
         description="url for submit mcp server", default=f"{os.environ['MCP_SERVER_URL']}/submit/sse"
     )
 

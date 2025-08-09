@@ -29,7 +29,7 @@ def submit(ans: str) -> str:
 
     logger.info("[submit_mcp] submit mcp called")
     # FIXME: reference url from config file, remove hard coding
-    url = langgraph_tool_config.mcp_observability
+    url = langgraph_tool_config.jaeger_mcp_url
     headers = {"Content-Type": "application/json"}
     # Match curl behavior: send "\"yes\"" when ans is "yes"
     payload = {"solution": f'"{ans}"'}

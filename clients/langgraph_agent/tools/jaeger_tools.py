@@ -37,7 +37,7 @@ async def get_traces(service: str, last_n_minutes: int, tool_call_id: Annotated[
 
     exit_stack = AsyncExitStack()
     logger.info("Using HTTP, connecting to server.")
-    server_url = langgraph_tool_config.mcp_observability
+    server_url = langgraph_tool_config.jaeger_mcp_url
     http_transport = await exit_stack.enter_async_context(sse_client(url=server_url))
     session = await exit_stack.enter_async_context(ClientSession(*http_transport))
 
@@ -139,7 +139,7 @@ async def get_services(tool_call_id: Annotated[str, InjectedToolCallId]) -> Comm
     logger.info(f"calling mcp get_services from langchain get_services")
     exit_stack = AsyncExitStack()
     logger.info("Using HTTP, connecting to server.")
-    server_url = langgraph_tool_config.mcp_observability
+    server_url = langgraph_tool_config.jaeger_mcp_url
     http_transport = await exit_stack.enter_async_context(sse_client(url=server_url))
     session = await exit_stack.enter_async_context(ClientSession(*http_transport))
 
@@ -181,7 +181,7 @@ async def get_operations(
     logger.info(f"calling mcp get_operations from langchain get_operations with service {service}")
     exit_stack = AsyncExitStack()
     logger.info("Using HTTP, connecting to server.")
-    server_url = langgraph_tool_config.mcp_observability
+    server_url = langgraph_tool_config.jaeger_mcp_url
     http_transport = await exit_stack.enter_async_context(sse_client(url=server_url))
     session = await exit_stack.enter_async_context(ClientSession(*http_transport))
 

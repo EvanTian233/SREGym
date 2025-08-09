@@ -44,7 +44,7 @@ async def get_metrics(
     exit_stack = AsyncExitStack()
     logger.info("Using HTTP, connecting to server.")
     # server_url = "http://127.0.0.1:9953/sse"
-    server_url = langgraph_tool_config.mcp_prometheus
+    server_url = langgraph_tool_config.prometheus_mcp_url
     # Register both the SSE client and session with an async exit stack so they will automatically clean up when
     # you're done (e.g. close connections properly
 
