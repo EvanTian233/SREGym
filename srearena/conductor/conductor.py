@@ -4,7 +4,7 @@ from json.decoder import JSONDecodeError
 
 from srearena.conductor.oracles.detection import DetectionOracle
 from srearena.conductor.problems.registry import ProblemRegistry
-from srearena.service.apps.registry import AppRegistry
+from srearena.service.apps.app_registry import AppRegistry
 from srearena.service.kubectl import KubeCtl
 from srearena.service.telemetry.prometheus import Prometheus
 
