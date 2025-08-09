@@ -19,7 +19,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from srearena.conductor.conductor import Conductor, exit_cleanup_fault
+from srearena.conductor.conductor import Conductor
 from srearena.service.shell import Shell
 from srearena.utils.sigint_aware_section import SigintAwareSection
 
