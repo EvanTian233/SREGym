@@ -4,7 +4,7 @@ import os
 
 from dotenv import load_dotenv
 
-from .get_llm_backend import LiteLLMBackend
+from clients.langgraph_agent.llm_backend.get_llm_backend import LiteLLMBackend
 
 load_dotenv()
 
@@ -95,7 +95,6 @@ try:
 except KeyError:
     WATSONX_API_BASE = "https://us-south.ml.cloud.ibm.com"
     print(f"Unable to find environment variable - WATSONX_API_BASE. Setting to {WATSONX_API_BASE}.")
-
 
 
 try:

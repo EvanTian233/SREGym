@@ -10,13 +10,14 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.constants import END
 from langgraph.graph import START, StateGraph
 
-from .state import State
-from .tools.kubectl_tools import \
-    ExecKubectlCmdSafely, \
-    RollbackCommand, \
-    GetPreviousRollbackableCmd
-from .tools.stateful_async_tool_node import StatefulAsyncToolNode
-from .utils.ai_msg_mock_utils import ai_msg_tpl
+from clients.langgraph_agent.state import State
+from clients.langgraph_agent.tools.kubectl_tools import (
+    ExecKubectlCmdSafely,
+    GetPreviousRollbackableCmd,
+    RollbackCommand,
+)
+from clients.langgraph_agent.tools.stateful_async_tool_node import StatefulAsyncToolNode
+from clients.langgraph_agent.utils.ai_msg_mock_utils import ai_msg_tpl
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -93,15 +94,17 @@ class NL2KubectlAgent:
         if self.test_tool_or_ai_response == "tool":
             test_campaign = yaml.safe_load(open(self.test_campaign_file, "r"))
             cur_test = test_campaign["test"][self.test_tool_call_idx]
-            logger.info(f"\n[mock llm] test campaign tool call: {cur_test['tool_call']}"
-                        f"\nargs: {cur_test.get('args', dict())}")
+            logger.info(
+                f"\n[mock llm] test campaign tool call: {cur_test['tool_call']}"
+                f"\nargs: {cur_test.get('args', dict())}"
+            )
 
-            function_name = cur_test['tool_call']
-            function_args_str = json.dumps(cur_test.get('args', dict()))
+            function_name = cur_test["tool_call"]
+            function_args_str = json.dumps(cur_test.get("args", dict()))
             ai_message_template.additional_kwargs["tool_calls"][0]["function"]["arguments"] = function_args_str
             ai_message_template.additional_kwargs["tool_calls"][0]["function"]["name"] = function_name
             ai_message_template.tool_calls[0]["name"] = function_name
-            ai_message_template.tool_calls[0]["args"] = cur_test.get('args', dict())
+            ai_message_template.tool_calls[0]["args"] = cur_test.get("args", dict())
 
             logger.info("[mock llm] type: %s, ai message returned: %s", type(ai_message_template), ai_message_template)
             logger.info("[mock llm] tool calling, returning to ai")
