@@ -1,25 +1,22 @@
-from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field, field_validator
 import logging
-import yaml
 import os
 import uuid
 from pathlib import Path
 
-from fastmcp.client.transports import SSETransport
-from fastmcp import Client
-
+import yaml
 from dotenv import load_dotenv
-from clients.langgraph_agent.tools.kubectl_tools import \
-    ExecKubectlCmdSafely, \
-    RollbackCommand, \
-    GetPreviousRollbackableCmd, \
-    ExecReadOnlyKubectlCmd
-from clients.langgraph_agent.tools.jaeger_tools import \
-    get_traces, \
-    get_services, \
-    get_operations
+from fastmcp import Client
+from fastmcp.client.transports import SSETransport
+from langchain_core.tools import BaseTool
+from pydantic import BaseModel, Field, field_validator
 
+from clients.langgraph_agent.tools.jaeger_tools import get_operations, get_services, get_traces
+from clients.langgraph_agent.tools.kubectl_tools import (
+    ExecKubectlCmdSafely,
+    ExecReadOnlyKubectlCmd,
+    GetPreviousRollbackableCmd,
+    RollbackCommand,
+)
 from clients.langgraph_agent.tools.prometheus_tools import get_metrics
 from clients.langgraph_agent.tools.submit_tool import submit_tool
 from clients.langgraph_agent.tools.wait_tool import wait_tool
@@ -34,21 +31,19 @@ load_dotenv()
 
 class BaseAgentCfg(BaseModel):
     max_round: int = Field(
-        default=int(os.environ["MAX_ROUND"]),
-        description="maximum rounds allowed for tool calling",
-        gt=0
+        default=int(os.environ["MAX_ROUND"]), description="maximum rounds allowed for tool calling", gt=0
     )
 
     max_rec_round: int = Field(
         default=int(os.environ["MAX_REC_ROUND"]),
         description="maximum rounds allowed for submission rectification",
-        gt=0
+        gt=0,
     )
 
     max_tool_call_one_round: int = Field(
         default=int(os.environ["MAX_TOOL_CALL_ONE_ROUND"]),
         description="maximum number of tool_calls allowed in one round",
-        gt=0
+        gt=0,
     )
 
     prompts_file_path: str = Field(
@@ -73,11 +68,11 @@ class BaseAgentCfg(BaseModel):
         if not os.path.isfile(path):
             raise ValueError(f"Path is not a file: {path}")
 
-        if not path.endswith(('.yaml', '.yml')):
+        if not path.endswith((".yaml", ".yml")):
             raise ValueError(f"Invalid file extension (expected .yaml or .yml): {path}")
 
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 yaml.safe_load(f)
         except yaml.YAMLError as e:
             raise ValueError(f"YAML parsing error: {e}")
@@ -92,10 +87,8 @@ def get_diagnosis_agent_cfg():
     exec_read_only_kubectl_cmd = ExecReadOnlyKubectlCmd(client)
     diagnosis_agent_cfg = BaseAgentCfg(
         prompts_file_path=str(parent_dir / "stratus_diagnosis_agent_prompts.yaml"),
-        sync_tools=[submit_tool],
-        async_tools=[get_traces, get_services,
-                     get_operations, get_metrics,
-                     exec_read_only_kubectl_cmd],
+        sync_tools=[],
+        async_tools=[get_traces, get_services, get_operations, get_metrics, exec_read_only_kubectl_cmd, submit_tool],
     )
     return diagnosis_agent_cfg
 
@@ -119,16 +112,13 @@ def get_mitigation_rollback_agent_cfg():
 
     mitigation_agent_cfg = BaseAgentCfg(
         prompts_file_path=str(parent_dir / "stratus_mitigation_agent_prompts.yaml"),
-        sync_tools=[submit_tool, wait_tool],
-        async_tools=[get_traces, get_services,
-                     get_operations, get_metrics,
-                     exec_kubectl_cmd_safely],
+        sync_tools=[wait_tool],
+        async_tools=[get_traces, get_services, get_operations, get_metrics, exec_kubectl_cmd_safely, submit_tool],
     )
 
     rollback_agent_cfg = BaseAgentCfg(
         prompts_file_path=str(parent_dir / "stratus_rollback_agent_prompts.yaml"),
-        sync_tools=[submit_tool],
-        async_tools=[rollback_command,
-                     get_previous_rollbackable_cmd],
+        sync_tools=[],
+        async_tools=[rollback_command, get_previous_rollbackable_cmd, submit_tool],
     )
     return mitigation_agent_cfg, rollback_agent_cfg
