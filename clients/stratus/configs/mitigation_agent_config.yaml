@@ -1,0 +1,13 @@
+# each step is defined as one tool call
+max_step: 20
+sync_tools: [wait_tool]
+async_tools:
+  - get_traces
+  - get_services
+  - get_operations
+  - get_metrics
+  - exec_read_only_kubectl_cmd
+  - submit_tool
+prompts_path: mitigation_agent_prompts.yaml
+
+

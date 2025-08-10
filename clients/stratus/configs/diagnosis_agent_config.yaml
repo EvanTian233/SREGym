@@ -1,0 +1,14 @@
+# each step is defined as one tool call
+max_step: 20
+# diagnosis agent has no synchronous tools
+sync_tools: []
+async_tools:
+  - get_traces
+  - get_services
+  - get_operations
+  - get_metrics
+  - exec_read_only_kubectl_cmd
+  - submit_tool
+prompts_path: diagnosis_agent_prompts.yaml
+
+

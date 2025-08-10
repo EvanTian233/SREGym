@@ -1,0 +1,9 @@
+# each step is defined as one tool call
+max_step: 20
+sync_tools: [wait_tool]
+async_tools:
+  - rollback_command
+  - get_previous_rollbackable_cmd
+  - submit_tool
+
+prompts_path: rollback_agent_prompts.yaml
