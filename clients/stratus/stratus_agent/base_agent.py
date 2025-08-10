@@ -45,6 +45,14 @@ class BaseAgent:
             "messages": ai_message,
         }
 
+    def llm_tool_call_step(self, state: State, tools):
+        human_prompt = HumanMessage(content="Now generate a tool call according to your last chosen tool.")
+        return {
+            "messages": self.llm_inference_step(
+                state["messages"] + [human_prompt], tools=self.sync_tools + self.async_tools
+            ),
+        }
+
     def save_agent_graph_to_png(self):
         with open("./agent_graph.png", "wb") as png:
             png.write(self.graph.get_graph().draw_mermaid_png())
@@ -98,14 +106,14 @@ class BaseAgent:
 
         state = {
             "messages": starting_prompts,
-            "workdir": "",
-            "curr_file": "",
-            "curr_line": 0,
-            "num_rounds": 0,
-            "rec_submission_rounds": 0,
-            "submit_tried": False,
+            # "workdir": "",
+            # "curr_file": "",
+            # "curr_line": 0,
+            "num_steps": 0,
+            # "rec_submission_rounds": 0,
+            # "submit_tried": False,
             "submitted": False,
-            "ans": dict(),
+            # "ans": dict(),
         }
 
         res = []
