@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 from typing import Dict, Optional
 
 import litellm
@@ -9,7 +10,6 @@ from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_litellm import ChatLiteLLM
 from langchain_openai import ChatOpenAI
-import time
 from requests.exceptions import HTTPError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -24,20 +24,20 @@ INIT_RETRY_DELAY = int(os.getenv("INIT_RETRY_DELAY", "1"))  # Initial delay in s
 class LiteLLMBackend:
 
     def __init__(
-            self,
-            provider: str,
-            model_name: str,
-            url: str,
-            api_key: str,
-            api_version: str,
-            seed: int,
-            top_p: float,
-            temperature: float,
-            reasoning_effort: str,
-            thinking_tools: str,
-            thinking_budget_tools: int,
-            max_tokens: int,
-            extra_headers: Optional[Dict[str, str]] = None,
+        self,
+        provider: str,
+        model_name: str,
+        url: str,
+        api_key: str,
+        api_version: str,
+        seed: int,
+        top_p: float,
+        temperature: float,
+        reasoning_effort: str,
+        thinking_tools: str,
+        thinking_budget_tools: int,
+        max_tokens: int,
+        extra_headers: Optional[Dict[str, str]] = None,
     ):
         self.provider = provider
         self.model_name = model_name
@@ -55,10 +55,10 @@ class LiteLLMBackend:
         litellm.drop_params = True
 
     def inference(
-            self,
-            messages: str | list[SystemMessage | HumanMessage | AIMessage],
-            system_prompt: Optional[str] = None,
-            tools: Optional[list[any]] = None,
+        self,
+        messages: str | list[SystemMessage | HumanMessage | AIMessage],
+        system_prompt: Optional[str] = None,
+        tools: Optional[list[any]] = None,
     ):
         if isinstance(messages, str):
             # logger.info(f"NL input as str received: {messages}")
@@ -103,6 +103,8 @@ class LiteLLMBackend:
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
+        logger.info(f"llm is: {llm}")
+
         if tools:
             logger.info(f"binding tools to llm: {tools}")
             llm = llm.bind_tools(tools, tool_choice="auto")
@@ -121,7 +123,8 @@ class LiteLLMBackend:
             except HTTPError as e:
                 if e.response.status_code == 429:  # Rate-limiting error
                     logger.warning(
-                        f"Rate-limited. Retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{MAX_RETRIES})")
+                        f"Rate-limited. Retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{MAX_RETRIES})"
+                    )
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
                 else:
