@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseAgent:
-    def __init__(self, llm, max_step, sync_tools, async_tools, tool_descs):
+    def __init__(self, llm, max_step, sync_tools, async_tools, submit_tool, tool_descs):
         self.graph_builder = StateGraph(State)
         self.graph: CompiledStateGraph | None = None
         self.max_round = max_step
@@ -25,6 +25,7 @@ class BaseAgent:
         self.sync_tools = sync_tools
         self.llm = llm
         self.tool_descs = tool_descs
+        self.submit_tool = submit_tool
 
     def llm_inference_step(self, messages, tools):
         return self.llm.inference(messages=messages, tools=tools)
@@ -51,6 +52,12 @@ class BaseAgent:
                 state["messages"] + [human_prompt], tools=self.sync_tools + self.async_tools
             ),
         }
+
+    def llm_submit_tool_call_step(self, state: State):
+        human_prompt = HumanMessage(
+            content="You have reached your step limit, please submit your results by generating a `submit` tool's tool call."
+        )
+        return {"messages": self.llm_inference_step(state["messages"] + [human_prompt], tools=[self.submit_tool])}
 
     def save_agent_graph_to_png(self):
         with open("./agent_graph.png", "wb") as png:

@@ -21,23 +21,36 @@ class DiagnosisAgent(BaseAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.tool_node = None
+        self.max_step = kwargs.get("max_step", 20)
+        self.thinking_node = "thinking_step"
+        self.tool_calling_node = "tool_calling_step"
+        self.process_tool_call_node = "process_tool_call"
+        self.post_round_process_node = "post_round_process"
+        self.force_submit_node = "force_submit"
+
+    def should_submit_router(self, state: State):
+        should_submit = state["num_steps"] == self.max_step
+        logger.info("Should the agent submit?" + "Yes!" if should_submit else "No!")
+        return self.force_submit_node if should_submit else END
+
+    def force_submit_thinking_step(self, state: State):
+        logger.info("Agent reached 20 steps, forcing the agent to make a ToolCall")
 
     def post_round_process(self, state: State):
+        logger.info("agent finished a round")
+        logger.info("currently only incrementing step")
         return {
             "num_steps": state["num_steps"] + 1,
         }
 
     def build_agent(self):
         self.tool_node = StratusToolNode(async_tools=self.async_tools, sync_tools=self.sync_tools)
-        thinking_node = "thinking_step"
-        tool_calling_node = "tool_calling_step"
-        process_tool_call_node = "process_tool_call"
-        post_round_process_node = "post_round_process"
+
         # we add the node to the graph
-        self.graph_builder.add_node(thinking_node, self.llm_thinking_step)
-        self.graph_builder.add_node(tool_calling_node, self.llm_tool_call_step)
-        self.graph_builder.add_node(process_tool_call_node, self.tool_node)
-        self.graph_builder.add_node(post_round_process_node, self.post_round_process)
+        self.graph_builder.add_node(self.thinking_node, self.llm_thinking_step)
+        self.graph_builder.add_node(self.tool_calling_node, self.llm_tool_call_step)
+        self.graph_builder.add_node(self.process_tool_call_node, self.tool_node)
+        self.graph_builder.add_node(self.post_round_process_node, self.post_round_process)
 
         # commenting these out first, focusing on basic diagnosis capability
         # self.graph_builder.add_node("post_tool_hook", self.post_tool_hook)
@@ -120,6 +133,10 @@ class DiagnosisAgent(BaseAgent):
             ):
                 graph_events.append(event)
                 event["messages"][-1].pretty_print()
+            last_state = self.graph.get_state(config=graph_config)
+            if last_state.values["num_steps"] == 20:
+                logger.info("Agent did not converge.")
+                break
 
         return graph_events[-1]
 
@@ -139,12 +156,14 @@ def main():
         sync_tools.append(str_to_tool(sync_tool_struct))
         async_tools.append(str_to_tool(async_tool_struct))
         tool_descriptions += sync_tool_struct["description"] + "\n\n" + async_tool_struct["description"]
+    submit_tool = str_to_tool("submit_tool")
 
     agent = DiagnosisAgent(
         llm=get_llm_backend_for_tools(),
         max_step=max_step,
         sync_tools=sync_tools,
         async_tools=async_tools,
+        submit_tool=submit_tool,
         tool_descs=tool_descriptions,
     )
     agent.build_agent()
