@@ -17,18 +17,9 @@ system: >
   
   1) detection:
   You have to decide whether the application has anomalies or not.
-  Answer this question with a bool value; True if there are anomalies.
+  Answer this question with a "Yes" if you decided that the cluster has anomalies; "No" if there are none.
   
-  2) localization:
-  You are requested to identify the service(s) where the root cause of the fault lies.
-  You will begin by analyzing the service's state and telemetry, and then submit one of two possible solutions:
-  1. list[str]: list of faulty components (i.e., service names)
-  2. list[]: an empty list if no faults were detected
-  
-  3) summarization:
-  If you have identified the fault(s), you have to summarize the information you learnt from your interaction.
-  Answer this question with a string, which is the summarization.
-  It should be short, clear and, most importantly, useful for a later mitigation agent to mitigate the fault(s).
+
 #  Analyze the traces or metrics to localize which part of the system, e.g., a service, a component, a pod, a node, etc., has anomalies.
 #  Always use provided tools to get filtered traces first to help with localization.
 #  You should answer this question with a dictionary in python that has following items:
@@ -48,11 +39,9 @@ system: >
 #  In that case, <A> should be restarted. These can only be known by investigating traces and events more deeply on <A> and <B>.
 
 user: >
-  In each round, there is an explanation stage where you should respond with reasons of why you want to call the tools with the arguments next;
-  the tools you mentioned must be available to you at first; 
-  then, there is a tool-call stage, where you make tool_calls consistent with your explanation.
+  In each round, there is a thinking stage. In the thinking stage, you are given a list of tools. Think about what you want to call. Return your tool choice and the reasoning behind
+  Then, there is a tool-call stage, where you make a tool_call consistent with your explanation.
   You can run up to {max_step} rounds to finish the tasks.
-  If you call submit_tool in tool-call stage, the process will end immediately and this round won’t count toward the limit.
-  If you exceed this limitation, the system will force to end the conversation and you will be considered failing the tasks.
-  You should minimize the number of interaction rounds while ensuring task completion.
+  If you call submit_tool in tool-call stage, the process will end immediately.
+  If you exceed this limitation, the system will force you to make a submission.
   You will begin by analyzing the service's state and telemetry with the tools.
