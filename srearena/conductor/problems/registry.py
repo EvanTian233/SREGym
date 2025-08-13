@@ -37,9 +37,9 @@ from srearena.conductor.problems.pod_anti_affinity_deadlock import PodAntiAffini
 from srearena.conductor.problems.pod_failure import ChaosMeshPodFailure
 from srearena.conductor.problems.pod_kill import ChaosMeshPodKill
 from srearena.conductor.problems.product_catalog_failure import ProductCatalogServiceFailure
+from srearena.conductor.problems.pvc_claim_mismatch import PVCClaimMismatch
 from srearena.conductor.problems.readiness_probe_misconfiguration import ReadinessProbeMisconfiguration
 from srearena.conductor.problems.recommendation_service_cache_failure import RecommendationServiceCacheFailure
-from srearena.conductor.problems.redeploy_without_pv import RedeployWithoutPV
 from srearena.conductor.problems.resource_request import ResourceRequestTooLarge, ResourceRequestTooSmall
 from srearena.conductor.problems.revoke_auth import MongoDBRevokeAuth
 from srearena.conductor.problems.rolling_update_misconfigured import RollingUpdateMisconfigured
@@ -47,6 +47,7 @@ from srearena.conductor.problems.scale_pod import ScalePodSocialNet
 from srearena.conductor.problems.service_dns_resolution_failure import ServiceDNSResolutionFailure
 from srearena.conductor.problems.sidecar_port_conflict import SidecarPortConflict
 from srearena.conductor.problems.stale_coredns_config import StaleCoreDNSConfig
+from srearena.conductor.problems.storage_provisioner_outage import StorageProvisionerOutage
 from srearena.conductor.problems.storage_user_unregistered import MongoDBUserUnregistered
 from srearena.conductor.problems.taint_no_toleration import TaintNoToleration
 from srearena.conductor.problems.target_port import K8STargetPortMisconfig
@@ -93,7 +94,6 @@ class ProblemRegistry:
             "astronomy_shop_payment_service_unreachable": PaymentServiceUnreachable,
             "astronomy_shop_product_catalog_service_failure": ProductCatalogServiceFailure,
             "astronomy_shop_recommendation_service_cache_failure": RecommendationServiceCacheFailure,
-            "redeploy_without_PV": RedeployWithoutPV,
             "wrong_bin_usage": WrongBinUsage,
             "taint_no_toleration_social_network": lambda: TaintNoToleration(),
             "missing_service_hotel_reservation": lambda: MissingService(
@@ -203,6 +203,7 @@ class ProblemRegistry:
             "incorrect_port_assignment": IncorrectPortAssignment,
             "incorrect_image": IncorrectImage,
             "namespace_memory_limit": NamespaceMemoryLimit,
+            "pvc_claim_mismatch": PVCClaimMismatch,
             # "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
             # K8S operator misoperation -> Refactor later, not sure if they're working
             # They will also need to be updated to the new problem format.
