@@ -48,15 +48,15 @@ class BaseAgent:
         human_prompt = HumanMessage(content="Now generate a tool call according to your last chosen tool.")
         if self.sync_tools is None:
             if self.async_tools is not None:
-                ai_message = self.llm_inference_step(state["messages"] + [human_prompt], tools=[self.async_tools])
+                ai_message = self.llm_inference_step(state["messages"] + [human_prompt], tools=self.async_tools)
             else:
                 raise ValueError("the agent must have at least 1 tool!")
         else:
             if self.async_tools is None:
-                ai_message = (self.llm_inference_step(state["messages"] + [human_prompt], tools=[self.sync_tools]),)
+                ai_message = (self.llm_inference_step(state["messages"] + [human_prompt], tools=self.sync_tools),)
             else:
                 ai_message = self.llm_inference_step(
-                    state["messages"] + [human_prompt], tools=[self.sync_tools + self.async_tools]
+                    state["messages"] + [human_prompt], tools=[*self.sync_tools, *self.async_tools]
                 )
         return {
             "messages": [human_prompt, ai_message],
