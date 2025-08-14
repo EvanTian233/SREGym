@@ -26,7 +26,6 @@ class DiagnosisAgent(BaseAgent):
     def build_agent(self):
         self.tool_node = StratusToolNode(async_tools=self.async_tools, sync_tools=self.sync_tools)
 
-        # we add the node to the graph
         self.graph_builder.add_node(self.thinking_prompt_inject_node, self.llm_thinking_prompt_inject_step)
         self.graph_builder.add_node(self.tool_calling_prompt_inject_node, self.llm_tool_call_prompt_inject_step)
         self.graph_builder.add_node(self.thinking_node, self.llm_thinking_step)
@@ -34,10 +33,6 @@ class DiagnosisAgent(BaseAgent):
         self.graph_builder.add_node(self.process_tool_call_node, self.tool_node)
         self.graph_builder.add_node(self.post_round_process_node, self.post_round_process)
         self.graph_builder.add_node(self.force_submit_node, self.llm_force_submit_tool_call_node)
-
-        # commenting these out first, focusing on basic diagnosis capability
-        # self.graph_builder.add_node("post_tool_hook", self.post_tool_hook)
-        # self.graph_builder.add_node("summarize_messages", self.summarize_messages)
 
         self.graph_builder.add_edge(START, self.thinking_prompt_inject_node)
         self.graph_builder.add_edge(self.thinking_prompt_inject_node, self.thinking_node)
@@ -56,26 +51,6 @@ class DiagnosisAgent(BaseAgent):
         self.graph_builder.add_edge(self.force_submit_node, END)
         self.graph_builder.add_edge(self.post_round_process_node, END)
 
-        #     self.graph_builder.add_conditional_edges(
-        #     "explanation_agent",
-        #     self.check_if_summaries_needed,  # This must return True or False
-        #     {
-        #         True: "summarize_messages",
-        #         False: "tool_node",
-        #     }
-        # )
-        # self.graph_builder.add_edge("summarize_messages", "explanation_agent")
-        # self.graph_builder.add_conditional_edges(
-        #     "tool_node",
-        #     self.check_if_summaries_needed,  # should return True or False
-        #     {True: "summarize_messages", False: "post_tool_hook"},
-        # )
-        # self.graph_builder.add_conditional_edges(
-        #     "post_tool_hook",
-        #     self.post_tool_route,
-        #     {"explanation_agent": "explanation_agent", END: END},
-        # )
-        # self.graph_builder.add_edge("summarize_messages", "post_tool_hook")
         memory = MemorySaver()
         self.graph = self.graph_builder.compile(checkpointer=memory)
 
