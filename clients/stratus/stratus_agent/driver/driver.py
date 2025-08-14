@@ -14,11 +14,17 @@ from clients.stratus.weak_oracles.base_oracle import BaseOracle, OracleResult
 logger = get_logger()
 
 
-def validate_oracles(oracles: List[BaseOracle]) -> bool:
+def validate_oracles(oracles: List[BaseOracle]) -> List[bool | List[OracleResult]]:
+    results = []
+    attempt_failed = False
     for oracle in oracles:
         res: OracleResult = oracle.validate()
         if not res.success:
-            return False
+            attempt_failed = True
+            results.append(res)
+    if attempt_failed:
+        return [False, results]
+    return [True, results]
 
 
 async def mitigation_task_main():
