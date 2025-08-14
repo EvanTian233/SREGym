@@ -27,7 +27,10 @@ class TrainTicket(Application):
         self.frontend_port = None
 
     def deploy(self):
-        """Deploy the Helm configurations and flagd infrastructure."""
+        if self._is_train_ticket_deployed():
+            print(f"[TrainTicket] Skipping deployment: train-ticket app is already deployed in namespace {self.namespace}")
+            return
+        
         if self.namespace:
             self.kubectl.create_namespace_if_not_exist(self.namespace)
 
@@ -40,11 +43,39 @@ class TrainTicket(Application):
     def delete(self):
         """Delete the Helm configurations."""
         # Helm.uninstall(**self.helm_configs) # Don't helm uninstall until cleanup job is fixed on train-ticket
+        if self._is_train_ticket_deployed():
+            print(f"[TrainTicket] Skipping deletion: train-ticket app is currently deployed in namespace {self.namespace}")
+            return
+        
         if self.namespace:
             self.kubectl.delete_namespace(self.namespace)
         self.kubectl.wait_for_namespace_deletion(self.namespace)
 
+    def _is_train_ticket_deployed(self):
+        """Check if the train-ticket app is currently deployed."""
+        try:
+
+            # Check if the namespace exists
+            namespace_exists = self.kubectl.exec_command(f"kubectl get namespace {self.namespace}")
+            if "not found" in namespace_exists or "No resources found" in namespace_exists:
+                return False
+            
+            # Check if train-ticket deployment exists
+            deployment_exists = self.kubectl.exec_command(f"kubectl get deployment -n {self.namespace}")
+            if "No resources found" in deployment_exists or not deployment_exists.strip():
+                return False
+            
+            return True
+        except Exception as e:
+            print(f"[TrainTicket] Warning: Failed to check deployment status: {e}")
+            return False
+
     def cleanup(self):
+        """Cleanup the train-ticket application if it's not currently deployed."""
+        if self._is_train_ticket_deployed():
+            print(f"[TrainTicket] Skipping cleanup: train-ticket app is currently deployed in namespace {self.namespace}")
+            return
+        
         # Helm.uninstall(**self.helm_configs)
         if self.namespace:
             self.kubectl.delete_namespace(self.namespace)
@@ -64,13 +95,11 @@ class TrainTicket(Application):
         print("[TrainTicket] Workload log collection started")
 
     def stop_workload(self):
-        """Stop the workload log collection."""
         if hasattr(self, "wrk"):
             self.wrk.stop()
             print("[TrainTicket] Workload log collection stopped")
 
     def _deploy_flagd_infrastructure(self):
-        """Deploy flagd service and ConfigMap for fault injection."""
         try:
             flagd_templates_path = TARGET_MICROSERVICES / "train-ticket" / "templates"
 
@@ -88,7 +117,6 @@ class TrainTicket(Application):
             print(f"[TrainTicket] Warning: Failed to deploy flagd infrastructure: {e}")
 
     def _deploy_load_generator(self):
-        """Deploy the auto-starting load generator (like astronomy shop)."""
         try:
 
             locustfile_path = Path(__file__).parent.parent.parent / "resources" / "trainticket" / "locustfile.py"
@@ -116,13 +144,7 @@ class TrainTicket(Application):
         except Exception as e:
             print(f"[TrainTicket] Warning: Failed to deploy load generator: {e}")
 
-    def get_flagd_status(self):
-        """Check if flagd infrastructure is running."""
-        try:
-            result = self.kubectl.exec_command(f"kubectl get pods -l app=flagd -n {self.namespace}")
-            return "Running" in result
-        except Exception:
-            return False
+    
 
 
 
