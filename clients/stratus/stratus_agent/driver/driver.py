@@ -35,7 +35,7 @@ def validate_oracles(oracles: List[BaseOracle]) -> List[bool | List[OracleResult
     return [True, results]
 
 
-async def mitigation_task_main():
+async def mitigation_task_main(localization_summary):
     # run rollback, reflect, and retry for mitigation and rollback agent
     # note: not implementing a `mitigation_task_main()` like other agents above for rollback, reflect, and retry is due to these considerations
     #   1. keep each agent's main() method only about running that specific agent's loop until agent's submission
@@ -57,20 +57,35 @@ async def mitigation_task_main():
     rollback_agent_max_step = rollback_agent_config["max_step"]
     rollback_agent_prompt_path = file_parent_dir.parent / "configs" / rollback_agent_config["prompts_path"]
 
+    file_parent_dir = Path(__file__).resolve().parent
+    llm_summarization_prompt_file = file_parent_dir.parent / "configs" / "llm_summarization_prompt.yaml"
+    llm_summarization_prompt = yaml.safe_load(open(llm_summarization_prompt_file, "r"))["mitigation_retry_prompt"]
+    mitigation_agent_prompts = yaml.safe_load(open(mitigation_agent_prompt_path, "r"))
+
     # oracle
     cluster_state_oracle = ClusterStateOracle()
     oracles = [cluster_state_oracle]
 
+    # defining the first set of messages that all retry mode share
+    first_run_initial_messages = [
+        SystemMessage(mitigation_agent_prompts["system"]),
+        HumanMessage(
+            mitigation_agent_prompts["user"].format(
+                max_step=mitigation_agent_max_step, faults_info=localization_summary
+            )
+        ),
+    ]
+
     # mitigation task in plain English:
     if mitigation_agent_retry_mode == "none":
         # if the retry mode is none, just run mitigation agent once.
-        await mitigation_agent_single_run()
+        await mitigation_agent_single_run(first_run_initial_messages)
     elif mitigation_agent_retry_mode == "naive":
         # if the retry mode is naive, run mitigation agent with retry but no rollback agent.
         curr_attempt = 0
         last_state = ""
         while curr_attempt < mitigation_agent_max_retry_attempts:
-            last_state = await mitigation_agent_single_run()
+            last_state = await mitigation_agent_single_run(first_run_initial_messages)
             oracle_results = validate_oracles(oracles)
             if oracle_results[0] is True:
                 # agent succeeds, let's finish here.
@@ -89,26 +104,24 @@ async def mitigation_task_main():
             success=False, issues=["This is the beginning of mitigation, please observe the cluster for issues."]
         )
         while curr_attempt < mitigation_agent_max_retry_attempts:
-            # TODO: add incident summary feature to localization agent for mitigation agent's initial prompts
             if curr_attempt == 0:
-                mitigation_agent_last_state = await mitigation_agent_single_run()
+                mitigation_agent_last_state = await mitigation_agent_single_run(first_run_initial_messages)
             else:
                 # we compose the retry prompts here.
-                last_run_summary = generate_run_summary(mitigation_agent_last_state)
-                mitigation_agent_prompts = yaml.safe_load(open(mitigation_agent_prompt_path, "r"))
+                last_run_summary = generate_run_summary(mitigation_agent_last_state, llm_summarization_prompt)
                 retry_run_initial_messages = [
                     SystemMessage(mitigation_agent_prompts["system"]),
                     HumanMessage(
-                        # TODO: add faults info from localization here
-                        mitigation_agent_prompts["user"].format(max_step=mitigation_agent_max_step, faults_info="test")
+                        mitigation_agent_prompts["user"].format(
+                            max_step=mitigation_agent_max_step, faults_info=localization_summary
+                        )
                         + "\n\n"
                         + mitigation_agent_prompts["retry_user"].format(
                             last_result=str(oracle_results), reflection=last_run_summary
                         )
                     ),
                 ]
-
-                mitigation_agent_last_state = await mitigation_agent_retry_run(last_run_summary)
+                mitigation_agent_last_state = await mitigation_agent_retry_run(retry_run_initial_messages)
             oracle_results = validate_oracles(oracles)
             if oracle_results[0] is True:
                 # agent succeeds, let's finish here.
@@ -118,7 +131,7 @@ async def mitigation_task_main():
             # memory is cleared in the retry_run() method, so the agent can start anew.
             rollback_agent_last_state = await rollback_agent_main()
             curr_attempt += 1
-        return mitigation_agent_last_state
+        return mitigation_agent_last_state, rollback_agent_last_state
 
 
 async def main():
@@ -138,13 +151,22 @@ async def main():
     # (BTS it's just diagnosis agent with different prompts)
     # here, running the file's main function should suffice
     logger.info("*" * 25 + "Starting [localization agent] for [localization]" + "*" * 25)
-    await localization_task_main()
+    last_state = await localization_task_main()
     logger.info("*" * 25 + "Finished [localization agent]" + "*" * 25)
+
+    file_parent_dir = Path(__file__).resolve().parent.parent
+    localization_agent_config_path = file_parent_dir.parent / "configs" / "mitigation_agent_config.yaml"
+    localization_agent_config = yaml.safe_load(open(localization_agent_config_path, "r"))
+    localization_agent_prompt_path = file_parent_dir.parent / "configs" / localization_agent_config["prompts_path"]
+    localization_agent_prompts = yaml.safe_load(open(localization_agent_prompt_path, "r"))
+    localization_fault_summary = generate_run_summary(
+        last_state, localization_agent_prompts["localization_summary_prompt"]
+    )
 
     # run mitigation task 1 time for mitigation
     # it includes retry logics
     logger.info("*" * 25 + "Starting [mitigation agent] for [mitigation]" + "*" * 25)
-    await mitigation_task_main()
+    await mitigation_task_main(localization_fault_summary)
     logger.info("*" * 25 + "Finished [mitigation agent]" + "*" * 25)
 
 

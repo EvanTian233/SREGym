@@ -1,4 +1,4 @@
-prompt: |
+mitigation_retry_prompt: |
   Summarize a human-LLM (large language model) conversation by carefully analyzing the interaction, identifying both successes and failures before writing any summaries. For each identified point, select a direct excerpt from the message list that best illustrates or justifies your summary. Then, generate two lists: one of summaries describing what worked well in the conversation, and another of summaries describing what didn’t work or where the interaction was unsuccessful.
 
   Be sure to:

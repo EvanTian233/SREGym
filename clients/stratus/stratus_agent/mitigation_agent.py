@@ -180,7 +180,7 @@ def build_default_mitigation_agent():
     return mitigation_agent, mitigation_agent_prompt_path, mitigation_agent_max_step
 
 
-def generate_run_summary(last_state: StateSnapshot) -> str:
+def generate_run_summary(last_state: StateSnapshot, summary_system_prompt) -> str:
     """
     Returns a SystemMessage and a HumanMessage as a list. They are summaries and reflections of a given last run
     `last_state`.
@@ -191,14 +191,11 @@ def generate_run_summary(last_state: StateSnapshot) -> str:
         Returns:
             a list of SystemMessage and HumanMessage representing the reflections
     """
-    file_parent_dir = Path(__file__).resolve().parent
-    llm_summarization_prompt_file = file_parent_dir.parent / "configs" / "llm_summarization_prompt.yaml"
-    llm_summarization_prompt = yaml.safe_load(open(llm_summarization_prompt_file, "r"))["prompt"]
     llm = get_llm_backend_for_tools()
     logger.info("asking LLM to summarize and reflect last run")
     last_run_msgs = last_state.values.get("messages", None)
     summary_input_messages = [
-        SystemMessage(llm_summarization_prompt),
+        SystemMessage(summary_system_prompt),
         HumanMessage(f"Here are the list of messages happened in the last conversation. \n\n {last_run_msgs}"),
     ]
     if last_run_msgs is None:
@@ -208,9 +205,9 @@ def generate_run_summary(last_state: StateSnapshot) -> str:
     return res
 
 
-async def single_run_with_predefined_prompts():
+async def single_run_with_predefined_prompts(init_prompts):
     agent, prompt_path, max_step = build_default_mitigation_agent()
-    res = await agent.arun(get_starting_prompts(prompt_path, max_step=max_step))
+    res = await agent.arun(init_prompts)
     return res
 
 

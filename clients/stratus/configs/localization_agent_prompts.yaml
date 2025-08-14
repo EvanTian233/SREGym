@@ -47,3 +47,7 @@ user: >
   If you call submit_tool in tool-call stage, the process will end immediately.
   If you exceed this limitation, the system will force you to make a submission.
   You will begin by analyzing the service's state and telemetry with the tools.
+
+localization_summary_prompt: |
+  You are a helper agent to an autonomous SRE agent.
+  Summarize the agent's trace and output the potential fault location and causes.
