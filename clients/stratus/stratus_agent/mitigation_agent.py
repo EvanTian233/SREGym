@@ -203,7 +203,7 @@ def reflect_run(last_state: StateSnapshot) -> str:
     ]
     if last_run_msgs is None:
         raise RuntimeError("StateSnapshot must contain messages!")
-    res = llm.infer(summary_input_messages)
+    res = llm.inference(summary_input_messages)
     res = res.content
     return res
 
