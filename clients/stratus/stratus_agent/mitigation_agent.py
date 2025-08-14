@@ -144,7 +144,7 @@ def main():
         }
     )
 
-    agent = MitigationAgent(
+    mitigation_agent = MitigationAgent(
         llm=get_llm_backend_for_tools(),
         max_step=max_step,
         sync_tools=sync_tools,
@@ -152,10 +152,10 @@ def main():
         submit_tool=submit_tool,
         tool_descs=tool_descriptions,
     )
-    agent.build_agent()
-    agent.save_agent_graph_to_png()
+    mitigation_agent.build_agent()
+    mitigation_agent.save_agent_graph_to_png()
 
-    res = asyncio.run(agent.arun(get_starting_prompts(prompt_path, max_step=max_step)))
+    res = asyncio.run(mitigation_agent.arun(get_starting_prompts(prompt_path, max_step=max_step)))
     print(res)
 
 
