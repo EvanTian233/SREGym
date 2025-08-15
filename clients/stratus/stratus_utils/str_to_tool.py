@@ -33,7 +33,6 @@ def get_client():
 
 
 def str_to_tool(tool_struct: dict[str, str]):
-    logger.info(f"tool_struct: {tool_struct}")
     if tool_struct["name"] == "get_traces":
         return get_traces
     elif tool_struct["name"] == "get_services":
