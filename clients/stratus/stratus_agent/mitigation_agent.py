@@ -144,13 +144,17 @@ def build_default_mitigation_agent():
     if mitigation_agent_config["sync_tools"] is not None:
         for sync_tool_struct in mitigation_agent_config["sync_tools"]:
             mitigation_agent_sync_tools.append(str_to_tool(sync_tool_struct))
-            mitigation_agent_tool_descriptions += sync_tool_struct["description"] + "\n\n"
+            mitigation_agent_tool_descriptions += (
+                sync_tool_struct["name"] + "\n\n" + sync_tool_struct["description"] + "\n\n"
+            )
     else:
         mitigation_agent_sync_tools = None
     if mitigation_agent_config["async_tools"] is not None:
         for async_tool_struct in mitigation_agent_config["async_tools"]:
             mitigation_agent_async_tools.append(str_to_tool(async_tool_struct))
-            mitigation_agent_tool_descriptions += async_tool_struct["description"] + "\n\n"
+            mitigation_agent_tool_descriptions += (
+                async_tool_struct["name"] + "\n\n" + async_tool_struct["description"] + "\n\n"
+            )
     else:
         mitigation_agent_async_tools = None
 

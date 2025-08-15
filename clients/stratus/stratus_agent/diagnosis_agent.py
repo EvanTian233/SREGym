@@ -123,13 +123,13 @@ async def main():
     if diagnosis_agent_config["sync_tools"] is not None:
         for sync_tool_struct in diagnosis_agent_config["sync_tools"]:
             sync_tools.append(str_to_tool(sync_tool_struct))
-            tool_descriptions += sync_tool_struct["description"] + "\n\n"
+            tool_descriptions += sync_tool_struct["name"] + "\n\n" + sync_tool_struct["description"] + "\n\n"
     else:
         sync_tools = None
     if diagnosis_agent_config["async_tools"] is not None:
         for async_tool_struct in diagnosis_agent_config["async_tools"]:
             async_tools.append(str_to_tool(async_tool_struct))
-            tool_descriptions += async_tool_struct["description"] + "\n\n"
+            tool_descriptions += async_tool_struct["name"] + "\n\n" + async_tool_struct["description"] + "\n\n"
     else:
         async_tools = None
 

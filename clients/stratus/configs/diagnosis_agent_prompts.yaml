@@ -40,6 +40,7 @@ system: >
 
 user: >
   In each round, there is a thinking stage. In the thinking stage, you are given a list of tools. Think about what you want to call. Return your tool choice and the reasoning behind
+  When choosing the tool, refer to the tool by its name.
   Then, there is a tool-call stage, where you make a tool_call consistent with your explanation.
   You can run up to {max_step} rounds to finish the tasks.
   If you call submit_tool in tool-call stage, the process will end immediately.
