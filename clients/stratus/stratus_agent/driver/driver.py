@@ -32,11 +32,12 @@ from clients.stratus.weak_oracles.workload_oracle import WorkloadOracle
 logger = get_logger()
 
 
-def validate_oracles(oracles: List[BaseOracle]) -> List[bool | List[OracleResult]]:
+async def validate_oracles(oracles: List[BaseOracle]) -> List[bool | List[OracleResult]]:
     results = []
     attempt_failed = False
     for oracle in oracles:
-        res: OracleResult = oracle.validate()
+        logger.info(f"validating oracle: {oracle}")
+        res: OracleResult = await oracle.validate()
         if not res.success:
             attempt_failed = True
             results.append(res)
@@ -217,7 +218,7 @@ async def mitigation_task_main(localization_summary):
         while curr_attempt < mitigation_agent_max_retry_attempts:
             logger.info(f"current attempt: {curr_attempt + 1}/{mitigation_agent_max_retry_attempts}")
             last_state = await mitigation_agent_single_run(first_run_initial_messages)
-            oracle_results = validate_oracles(oracles)
+            oracle_results = await validate_oracles(oracles)
             logger.info(f"oracle results: {oracle_results}")
             if oracle_results[0] is True:
                 # agent succeeds, let's finish here.
@@ -228,6 +229,7 @@ async def mitigation_task_main(localization_summary):
             curr_attempt += 1
         return last_state
     elif mitigation_agent_retry_mode == "validate":
+        logger.info(f"retry mode: [{mitigation_agent_retry_mode}]")
         # if the retry mode is validation, run mitigation agent with rollback and weak oracle.
         # each start of new agent trial, the agent should receive the last run's oracle results
         # and some reflections as input
@@ -266,9 +268,9 @@ async def mitigation_task_main(localization_summary):
                 ]
                 logger.info(f"composed retry prompts: {retry_run_initial_messages}")
                 mitigation_agent_last_state = await mitigation_agent_retry_run(retry_run_initial_messages)
-            oracle_results = validate_oracles(oracles)
-            logger.info(f"sleeping for a minute for oracles to validate.")
-            asyncio.sleep(60)
+            oracle_results = await validate_oracles(oracles)
+            # logger.info(f"sleeping for a minute for oracles to validate.")
+            # await asyncio.sleep(60)
             has_succeeded = oracle_results[0]
             if has_succeeded:
                 # agent succeeds, let's finish here.
@@ -291,11 +293,11 @@ async def mitigation_task_main(localization_summary):
                     logger.info(f"agent failed, retrying... {curr_attempt + 1}/{mitigation_agent_max_retry_attempts}")
                     logger.info(f"running rollback agent to reverse progress")
                     rollback_agent_last_state = await rollback_agent_main()
-                    curr_attempt += 1
                 else:
                     logger.info("we shouldn't retry as we don't have more attempts left.")
                     logger.info(f"making a real submission for the agent.")
                     await manual_submit_tool("")
+                curr_attempt += 1
 
         return mitigation_agent_last_state, rollback_agent_last_state
 
