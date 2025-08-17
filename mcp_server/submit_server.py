@@ -38,4 +38,4 @@ def submit(ans: str) -> dict[str, str]:
         return {"status": str(response.status_code), "text": str(response.text)}
     except Exception as e:
         logger.error(f"[submit_mcp] HTTP submission failed: {e}")
-        return "error"
+        return {"status": "N/A", "text": f"[submit_mcp] HTTP submission failed: {e}"}
