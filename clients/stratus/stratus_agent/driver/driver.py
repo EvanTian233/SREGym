@@ -467,6 +467,9 @@ async def main():
     # here, running the file's main function should suffice.
     # 1 for noop diagnosis
     current_problem = get_curr_problem()
+    logger.info("*" * 25 + f" Testing {current_problem} ! " + "*" * 25)
+    logger.info("*" * 25 + f" Testing {current_problem} ! " + "*" * 25)
+    logger.info("*" * 25 + f" Testing {current_problem} ! " + "*" * 25)
     agent_output_df = pd.DataFrame()
     agent_names = []
     agent_in_tokens = []
@@ -571,6 +574,9 @@ async def main():
     agent_output_df["oracle_results"] = agent_oracle_results
     current_datetime = get_current_datetime_formatted()
     agent_output_df.to_csv(f"./{current_datetime}_{current_problem}_stratus_output.csv", index=False, header=True)
+    logger.info("*" * 25 + f" Finished Testing {current_problem} ! " + "*" * 25)
+    logger.info("*" * 25 + f" Finished Testing {current_problem} ! " + "*" * 25)
+    logger.info("*" * 25 + f" Finished Testing {current_problem} ! " + "*" * 25)
 
 
 if __name__ == "__main__":
