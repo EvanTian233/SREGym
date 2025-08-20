@@ -138,7 +138,7 @@ def main():
     if results:
         fieldnames = sorted({key for row in results for key in row.keys()})
         current_date_time = get_current_datetime_formatted()
-        csv_path = f"{current_date_time}_{agent_name}_results.csv"
+        csv_path = f"{current_date_time}_{agent_name}_ALL_results.csv"
         with open(csv_path, "w", newline="") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
