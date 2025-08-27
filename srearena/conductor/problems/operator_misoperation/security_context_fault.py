@@ -9,7 +9,7 @@ from typing import Any
 #from srearena.conductor.oracles.localization import LocalizationOracle
 #from srearena.conductor.oracles.target_port_mitigation import TargetPortMisconfigMitigationOracle
 from srearena.conductor.problems.base import Problem
-from srearena.generators.fault.inject_virtual import VirtualizationFaultInjector
+from srearena.generators.fault.inject_operator import K8SOperatorFaultInjector
 from srearena.paths import TARGET_MICROSERVICES
 from srearena.service.apps.fleet_cast import FleetCast
 from srearena.service.kubectl import KubeCtl
@@ -25,22 +25,16 @@ class K8SOperatorSecurityContextFault(Problem):
         self.kubectl = KubeCtl()
         # === Attach evaluation oracles ===
         #self.localization_oracle = MyFutureLocalizationOracle(problem=self, expected=["tidbclusters"])
-        #self.app.create_workload()
+        self.app.create_workload()
        # self.mitigation_oracle = MyOracleMitigation(problem=self)
     @mark_fault_injected
     def inject_fault(self):
-        injector = VirtualizationFaultInjector(namespace=self.namespace)
-        injector._inject(
-            fault_type="security_context",
-            microservices=[self.faulty_service],
-        )
+        injector = K8SOperatorFaultInjector(namespace=self.namespace)
+        injector.inject_security_context_fault()
         print(f"[FAULT INJECTED] {self.faulty_service} security context misconfigured")
     @mark_fault_injected
     def recover_fault(self):
-        injector = VirtualizationFaultInjector(namespace=self.namespace)
-        injector._recover(
-            fault_type="security_context",
-            microservices=[self.faulty_service],
-        )
+        injector = K8SOperatorFaultInjector(namespace=self.namespace)
+        injector.recover_security_context_fault()
         print(f"[FAULT RECOVERED] {self.faulty_service}")
      

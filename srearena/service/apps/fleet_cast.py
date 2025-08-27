@@ -36,16 +36,16 @@ class FleetCast(Application):
 
     def delete(self):
         """Delete the Helm configurations."""
-        Helm.uninstall(**self.helm_configs)
-        self.kubectl.delete_namespace(self.helm_configs["namespace"])
-        self.kubectl.wait_for_namespace_deletion(self.namespace)
+        # Helm.uninstall(**self.helm_configs)
+        # self.kubectl.delete_namespace(self.helm_configs["namespace"])
+        # self.kubectl.wait_for_namespace_deletion(self.namespace)
 
-    def cleanup(self):
-        Helm.uninstall(**self.helm_configs)
-        self.kubectl.delete_namespace(self.helm_configs["namespace"])
+    # def cleanup(self):
+    #     Helm.uninstall(**self.helm_configs)
+    #     self.kubectl.delete_namespace(self.helm_configs["namespace"])
 
-        if hasattr(self, "wrk"):
-            self.wrk.stop()
+    #     if hasattr(self, "wrk"):
+    #         self.wrk.stop()
 
     def create_workload(self):
         self.wrk = LocustWorkloadManager(
