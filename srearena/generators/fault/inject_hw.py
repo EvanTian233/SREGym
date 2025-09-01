@@ -18,13 +18,7 @@ class HWFaultInjector(FaultInjector):
         self.khaos_ns = khaos_namespace
         self.khaos_daemonset_label = khaos_label
 
-    # ---------- Public entry points ----------
-
     def inject(self, microservices: List[str], fault_type: str):
-        """
-        microservices: list of pod identifiers.
-          Accepts either "pod" (default ns) or "ns/pod".
-        """
         for pod_ref in microservices:
             ns, pod = self._split_ns_pod(pod_ref)
             node = self._get_pod_node(ns, pod)
@@ -33,9 +27,6 @@ class HWFaultInjector(FaultInjector):
             self._exec_khaos_fault_on_node(node, fault_type, host_pid)
 
     def recover(self, microservices: List[str], fault_type: str):
-        """
-        Undo an injected fault on each node touched by these pods.
-        """
         touched = set()
         for pod_ref in microservices:
             ns, pod = self._split_ns_pod(pod_ref)
@@ -45,13 +36,10 @@ class HWFaultInjector(FaultInjector):
             self._exec_khaos_recover_on_node(node, fault_type)
             touched.add(node)
 
-    # ---------- Helpers: Kubernetes lookups ----------
-
     def _split_ns_pod(self, ref: str) -> Tuple[str, str]:
         if "/" in ref:
             ns, pod = ref.split("/", 1)
         else:
-            # default namespace if your KubeCtl defaults to one; otherwise pass explicit ns/pod everywhere
             ns, pod = "default", ref
         return ns, pod
 
@@ -69,14 +57,12 @@ class HWFaultInjector(FaultInjector):
         return node
 
     def _get_container_id(self, ns: str, pod: str) -> str:
-        # First try running container
+        # running container first
         cid = self._jsonpath(ns, pod, "{.status.containerStatuses[0].containerID}")
         if not cid:
-            # fall back to init container if needed
             cid = self._jsonpath(ns, pod, "{.status.initContainerStatuses[0].containerID}")
         if not cid:
             raise RuntimeError(f"Pod {ns}/{pod} has no containerID yet (not running?)")
-        # cid looks like "containerd://<ID>" or "docker://<ID>"
         if "://" in cid:
             cid = cid.split("://", 1)[1]
         return cid
@@ -86,58 +72,124 @@ class HWFaultInjector(FaultInjector):
         out = self.kubectl.exec_command(cmd)
         if isinstance(out, tuple):
             out = out[0]
-        data = json.loads(out)
+        data = json.loads(out or "{}")
         for item in data.get("items", []):
             if item.get("spec", {}).get("nodeName") == node and item.get("status", {}).get("phase") == "Running":
                 return item["metadata"]["name"]
         raise RuntimeError(f"No running Khaos DS pod found on node {node}")
 
-    # ---------- Host PID resolution (inside Khaos pod on that node) ----------
-
     def _get_host_pid_on_node(self, node: str, container_id: str) -> int:
-        """
-        Uses `crictl inspect <id>` inside the Khaos pod on that node.
-        Falls back to a jq-less parse if jq isn't present.
-        """
         pod_name = self._get_khaos_pod_on_node(node)
 
-        # Try with jq first
-        cmd = [
-            "kubectl",
-            "-n",
-            self.khaos_ns,
-            "exec",
-            pod_name,
-            "--",
-            "sh",
-            "-c",
-            f"crictl inspect {shlex.quote(container_id)} | jq -r .info.pid",
-        ]
+        # /proc scan (fast, works with hostPID:true)
         try:
-            pid_txt = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True).strip()
-            if pid_txt.isdigit():
-                return int(pid_txt)
-        except subprocess.CalledProcessError:
+            return self._get_host_pid_via_proc(pod_name, container_id)
+        except Exception:
             pass
 
-        # Fallback: grep for "pid" field without jq
+        # cgroup.procs search (works for both cgroup v1/v2)
+        try:
+            return self._get_host_pid_via_cgroups(pod_name, container_id)
+        except Exception:
+            pass
+
+        raise RuntimeError(
+            f"Failed to resolve host PID for container {container_id} on node {node} (proc, cgroups, cri all failed)"
+        )
+
+    def _get_host_pid_via_proc(self, khaos_pod: str, container_id: str) -> int:
+        """
+        Search host /proc/*/cgroup for the container ID and return the first PID.
+        With hostPID:true, /proc is the host's proc.
+        """
+        short = shlex.quote(container_id[:12])
         cmd = [
             "kubectl",
             "-n",
             self.khaos_ns,
             "exec",
-            pod_name,
+            khaos_pod,
             "--",
             "sh",
-            "-c",
-            f"crictl inspect {shlex.quote(container_id)} | sed -n 's/.*\"pid\"\\s*:\\s*\\([0-9][0-9]*\\).*/\\1/p' | head -n1",
+            "-lc",
+            # grep cgroup entries for the container id; extract pid from path
+            f"grep -l {short} /proc/*/cgroup 2>/dev/null | sed -n 's#.*/proc/\\([0-9]\\+\\)/cgroup#\\1#p' | head -n1",
         ]
-        pid_txt = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True).strip()
-        if not pid_txt.isdigit():
-            raise RuntimeError(f"Failed to resolve host PID for container {container_id} on node {node}: '{pid_txt}'")
-        return int(pid_txt)
+        pid_txt = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+        if pid_txt.isdigit():
+            return int(pid_txt)
 
-    # ---------- Khaos execution ----------
+        # Try full ID if short didn't match
+        fullq = shlex.quote(container_id)
+        cmd[-1] = "sh -lc " + shlex.quote(
+            f"grep -l {fullq} /proc/*/cgroup 2>/dev/null | sed -n 's#.*/proc/\\([0-9]\\+\\)/cgroup#\\1#p' | head -n1"
+        )
+        pid_txt = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+        if pid_txt.isdigit():
+            return int(pid_txt)
+
+        raise RuntimeError("proc scan found no matching PID")
+
+    def _detect_cgroup_root(self, khaos_pod: str) -> str:
+        """
+        Detect cgroup mount root (v2 unified vs v1). Returns a path under which cgroup.procs exists.
+        """
+        candidates = [
+            "/sys/fs/cgroup",  # cgroup v2 (unified)
+            "/sys/fs/cgroup/systemd",  # v1 systemd hierarchy
+            "/sys/fs/cgroup/memory",  # v1 memory hierarchy
+            "/sys/fs/cgroup/pids",  # v1 pids hierarchy
+        ]
+        for root in candidates:
+            cmd = [
+                "kubectl",
+                "-n",
+                self.khaos_ns,
+                "exec",
+                khaos_pod,
+                "--",
+                "sh",
+                "-lc",
+                f"test -d {shlex.quote(root)} && echo OK || true",
+            ]
+            out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+            if out == "OK":
+                return root
+        return "/sys/fs/cgroup"
+
+    def _get_host_pid_via_cgroups(self, khaos_pod: str, container_id: str) -> int:
+        """
+        Search cgroup.procs files whose path contains the container ID; return a PID from that file.
+        Works for both cgroup v1 and v2.
+        """
+        root = self._detect_cgroup_root(khaos_pod)
+        short = shlex.quote(container_id[:12])
+        cmd = [
+            "kubectl",
+            "-n",
+            self.khaos_ns,
+            "exec",
+            khaos_pod,
+            "--",
+            "sh",
+            "-lc",
+            # find a cgroup.procs in any directory name/path that includes the short id; print first PID in that procs file
+            f"find {shlex.quote(root)} -type f -name cgroup.procs -path '*{short}*' 2>/dev/null | head -n1 | xargs -r head -n1",
+        ]
+        pid_txt = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+        if pid_txt.isdigit():
+            return int(pid_txt)
+
+        # Try with full ID
+        fullq = shlex.quote(container_id)
+        cmd[-1] = "sh -lc " + shlex.quote(
+            f"find {root} -type f -name cgroup.procs -path '*{fullq}*' 2>/dev/null | head -n1 | xargs -r head -n1"
+        )
+        pid_txt = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+        if pid_txt.isdigit():
+            return int(pid_txt)
+
+        raise RuntimeError("cgroup search found no matching PID")
 
     def _exec_khaos_fault_on_node(self, node: str, fault_type: str, host_pid: int):
         pod_name = self._get_khaos_pod_on_node(node)
