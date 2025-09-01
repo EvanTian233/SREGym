@@ -18,6 +18,8 @@ class TrainTicket(Application):
     def load_app_json(self):
         super().load_app_json()
         metadata = self.get_app_json()
+        self.app_name = metadata["Name"]
+        self.description = metadata["Desc"]
         self.frontend_service = None
         self.frontend_port = None
 
@@ -31,7 +33,7 @@ class TrainTicket(Application):
         """Delete the Helm configurations."""
         # Helm.uninstall(**self.helm_configs) # Don't helm uninstall until cleanup job is fixed on train-ticket
         self.kubectl.delete_namespace(self.namespace)
-        time.sleep(30)
+        self.kubectl.wait_for_namespace_deletion(self.namespace)
 
     def cleanup(self):
         # Helm.uninstall(**self.helm_configs)
