@@ -78,7 +78,7 @@ class BHotelWrk:
             print(f"Error creating job: {e}")
 
     def start_workload(self,
-                       namespace = "default",
+                       namespace,
                        configmap_name = "bhotelwrk-wlgen-env",
                        job_name = "bhotelwrk-wlgen-job"):
 
@@ -86,7 +86,7 @@ class BHotelWrk:
 
         self.create_bhotelwrk_job(job_name=job_name, namespace=namespace)
 
-    def stop_workload(self, job_name="bhotelwrk-wlgen-proc", namespace="default"):
+    def stop_workload(self, namespace, job_name="bhotelwrk-wlgen-proc"):
 
         api_instance = client.BatchV1Api()
         try:
@@ -127,14 +127,14 @@ class BHotelWrkWorkloadManager(StreamWorkloadManager):
     Wrk2 workload generator for Kubernetes.
     """
 
-    def __init__(self, wrk: BHotelWrk, job_name="bhotelwrk-wlgen-job"):
+    def __init__(self, wrk: BHotelWrk, namespace:str = 'default', job_name:str="bhotelwrk-wlgen-job"):
         super().__init__()
         self.wrk = wrk
         self.job_name = job_name
-
+        self.namespace = namespace
         config.load_kube_config()
         self.core_v1_api = client.CoreV1Api()
-        self.batch_v1_api = client.BatchV1Api()
+        self.batch_v1_api = client.BatchV1Api() 
 
         self.log_pool = []
 
@@ -142,7 +142,7 @@ class BHotelWrkWorkloadManager(StreamWorkloadManager):
         self.last_log_line_time = None
 
     def create_task(self):
-        namespace = "default"
+        namespace = self.namespace
         configmap_name = "bhotelwrk-wlgen-env"
 
         self.wrk.create_configmap(
@@ -180,7 +180,7 @@ class BHotelWrkWorkloadManager(StreamWorkloadManager):
         )
 
     def retrievelog(self) -> list[WorkloadEntry]:
-        namespace = "default"
+        namespace = self.namespace
         grouped_logs = []
         pods = self.core_v1_api.list_namespaced_pod(namespace, label_selector=f"job-name={self.job_name}")
         if len(pods.items) == 0:
@@ -219,4 +219,4 @@ class BHotelWrkWorkloadManager(StreamWorkloadManager):
 
     def stop(self):
         print("== Stop Workload ==")
-        self.wrk.stop_workload(job_name=self.job_name)
+        self.wrk.stop_workload(job_name=self.job_name, namespace=self.namespace)

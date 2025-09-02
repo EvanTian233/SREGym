@@ -206,6 +206,35 @@ class KubeCtl:
 
             raise Exception(f"[red]Timeout: Namespace '{namespace}' was not deleted within {max_wait} seconds.")
 
+    def delete_job(self, job_name: str = None, label: str = None, namespace: str = 'default'):
+        """Delete a Kubernetes Job."""
+        console = Console()
+        api_instance = client.BatchV1Api()
+        try:
+            if job_name:
+                api_instance.delete_namespaced_job(name=job_name, namespace=namespace, body=client.V1DeleteOptions(propagation_policy="Foreground"))
+                console.log(f"[bold green]Job '{job_name}' deleted successfully.")
+            elif label:
+                # If label is provided, delete jobs by label
+                jobs = api_instance.list_namespaced_job(namespace=namespace, label_selector=label)
+                if jobs.items:
+                    for job in jobs.items:
+                        api_instance.delete_namespaced_job(name=job.metadata.name, namespace=namespace, body=client.V1DeleteOptions(propagation_policy="Foreground"))
+                        console.log(f"[bold green]Job with label '{label}' deleted successfully.")
+                else:
+                    console.log(f"[yellow]No jobs found with label '{label}' in namespace '{namespace}'.")
+            return True
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                console.log(f"[yellow]Job '{job_name}' not found in namespace '{namespace}' (already deleted)")
+                return True 
+            else:
+                console.log(f"[red]Error deleting job '{job_name}': {e}")
+                return False
+        except Exception as e:
+            console.log(f"[red]Unexpected error deleting job '{job_name}': {e}")
+            return False
+
     def wait_for_job_completion(self, job_name: str, namespace: str='default', timeout: int = 600):
         """Wait for a Kubernetes Job to complete successfully within a specified timeout."""
         api_instance = client.BatchV1Api()

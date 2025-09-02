@@ -159,8 +159,7 @@ class Conductor:
 
         print("Deploying and starting workload")
         self.problem.app.deploy()
-        if self.problem.app.app_name != "Blueprint Hotel Reservation":
-            self.problem.app.start_workload()
+        self.problem.app.start_workload()
 
     def undeploy_app(self):
         """Teardown problem.app and, if no other apps running, OpenEBS/Prometheus."""

@@ -6,8 +6,6 @@ from srearena.paths import FAULT_SCRIPTS, BLUEPRINT_HOTEL_RES_METADATA, TARGET_M
 from srearena.service.apps.base import Application
 from srearena.service.kubectl import KubeCtl
 
-from kubernetes import config
-
 class BlueprintHotelReservation(Application):
     def __init__(self):
         super().__init__(BLUEPRINT_HOTEL_RES_METADATA)
@@ -47,9 +45,7 @@ class BlueprintHotelReservation(Application):
             self.trace_api.stop_port_forward()
         self.kubectl.delete_namespace(self.namespace)
         self.kubectl.wait_for_namespace_deletion(self.namespace)
-
-        if hasattr(self, "wrk"):
-            self.wrk.stop()
+        self.kubectl.delete_job(label="job=workload")
 
     # helper methods
     def _read_script(self, file_path: str) -> str:
@@ -59,17 +55,9 @@ class BlueprintHotelReservation(Application):
     def create_workload(
         self, tput: int = None, duration: str = None, multiplier: int = None
     ):
-        if tput is None:
-            tput = 3000
-        if duration is None:
-            duration = "120s"
-        if multiplier is None:
-            multiplier = 6
-        self.wrk = BHotelWrkWorkloadManager(
-            wrk=BHotelWrk(tput=tput, duration=duration, multiplier=multiplier),
-        )
+        # The observation workload interface is in the problem class, keeping this interface empty to keep consistency in conductor
+        pass
 
     def start_workload(self):
-        if not hasattr(self, "wrk"):
-            self.create_workload()
-        self.wrk.start()
+        # The observation workload interface is in the problem class, keeping this interface empty to keep consistency in conductor
+        pass

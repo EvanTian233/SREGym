@@ -1667,17 +1667,8 @@ class VirtualizationFaultInjector(FaultInjector):
             print(f"  - Reset replicas to 1")
 
     def inject_rpc_timeout_retries_misconfiguration(self, configmap:str):
-        config.load_kube_config()
-        current_context = config.list_kube_config_contexts()[1]
-        cluster = current_context["context"]["cluster"]
-        is_kind = cluster.startswith("kind-")
-        if is_kind:
-            print("Yes it's kind cluster")
-            GRPC_CLIENT_TIMEOUT = "5ms"
-            GRPC_CLIENT_RETRIES_ON_ERROR = "50"
-        else:
-            GRPC_CLIENT_TIMEOUT = "50ms"
-            GRPC_CLIENT_RETRIES_ON_ERROR = "30"
+        GRPC_CLIENT_TIMEOUT = "50ms"
+        GRPC_CLIENT_RETRIES_ON_ERROR = "30"
         config_patch_command = f"kubectl patch configmap {configmap} -n {self.namespace} -p '{{\"data\":{{\"GRPC_CLIENT_TIMEOUT\":\"{GRPC_CLIENT_TIMEOUT}\",\"GRPC_CLIENT_RETRIES_ON_ERROR\":\"{GRPC_CLIENT_RETRIES_ON_ERROR}\"}}}}'"
         self.kubectl.exec_command(config_patch_command)
         deployment_rollout_command = f"kubectl rollout restart deployment -l configmap={configmap} -n {self.namespace}"

@@ -126,6 +126,14 @@ class RPCRetryStormMitigationOracle(Oracle):
             print(f"An error occurred during analysis: {e}")
             return False
 
+    def run_workload(self, problem, kubectl, namespace='default'):
+        problem.start_workload()
+        job_name = problem.wrk.job_name
+        kubectl.wait_for_job_completion(job_name=job_name, namespace=namespace, timeout=600)
+        workentries = problem.wrk.retrievelog()
+        workentry = workentries[0] if workentries else None
+        print(f"Workload Entry: {workentry}")
+        return workentry
 
     def evaluate(self) -> dict:
         print("== Mitigation Evaluation ==")
@@ -133,12 +141,8 @@ class RPCRetryStormMitigationOracle(Oracle):
         namespace = self.problem.namespace
 
         results = {}
-        self.problem.app.start_workload()
-        job_name = self.problem.app.wrk.job_name
-        kubectl.wait_for_job_completion(job_name=job_name, timeout=600)
-        workentries = self.problem.app.wrk.retrievelog()
-        workentry = workentries[0] if workentries else None
-        print(f"Workload Entry: {workentry}")
+        workentry = self.run_workload(problem=self.problem, kubectl=kubectl)
+
         not_metastable = self.analyze_latency_trend(workentry.log) if workentry else False
 
         if not_metastable:
