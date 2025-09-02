@@ -58,6 +58,8 @@ from srearena.conductor.problems.wrong_dns_policy import WrongDNSPolicy
 from srearena.conductor.problems.wrong_service_selector import WrongServiceSelector
 from srearena.conductor.problems.rpc_retry_storm import RPCRetryStorm
 
+from srearena.service.kubectl import KubeCtl
+
 class ProblemRegistry:
     def __init__(self):
         self.PROBLEM_REGISTRY = {
@@ -226,11 +228,17 @@ class ProblemRegistry:
             # "operator_wrong_update_strategy-localization-1": K8SOperatorWrongUpdateStrategyLocalization,
             "rpc_retry_storm": RPCRetryStorm,
         }
+        self.kubectl = KubeCtl()
+        self.non_emulated_cluster_problems = ["rpc_retry_storm"]
 
     def get_problem_instance(self, problem_id: str):
         if problem_id not in self.PROBLEM_REGISTRY:
             raise ValueError(f"Problem ID {problem_id} not found in registry.")
-
+        
+        is_emulated_cluster = self.kubectl.is_emulated_cluster()
+        if is_emulated_cluster and problem_id in self.non_emulated_cluster_problems:
+            raise RuntimeError(f"Problem ID {problem_id} is not supported in emulated clusters.")
+        
         return self.PROBLEM_REGISTRY.get(problem_id)()
 
     def get_problem(self, problem_id: str):
