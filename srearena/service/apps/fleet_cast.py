@@ -28,7 +28,7 @@ class FleetCast(Application):
         """Deploy the Helm configurations."""
         self.kubectl.create_namespace_if_not_exist(self.namespace)
         print("Deploying TiDB Cluster with Operator...")
-        base_dir = Path(__file__).parent.parent  # go up from apps/ → service/
+        base_dir = Path(__file__).parent.parent  
         meta_path = base_dir / "metadata" / "tidb_metadata.json"
 
         deployer = TiDBClusterDeployer(str(meta_path))
