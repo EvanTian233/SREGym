@@ -8,7 +8,7 @@ from srearena.conductor.problems.configmap_drift import ConfigMapDrift
 from srearena.conductor.problems.container_kill import ChaosMeshContainerKill
 from srearena.conductor.problems.cpu_stress import ChaosMeshCPUStress
 from srearena.conductor.problems.duplicate_pvc_mounts import DuplicatePVCMounts
-from srearena.conductor.problems.env_variable_leak import EnvVariableLeak
+from srearena.conductor.problems.missing_configmap import MissingConfigMap
 from srearena.conductor.problems.env_variable_shadowing import EnvVariableShadowing
 from srearena.conductor.problems.http_abort import ChaosMeshHttpAbort
 from srearena.conductor.problems.http_post_tamper import ChaosMeshHttpPostTamper
@@ -147,10 +147,10 @@ class ProblemRegistry:
             "sidecar_port_conflict_hotel_reservation": lambda: SidecarPortConflict(
                 app_name="hotel_reservation", faulty_service="frontend"
             ),
-            "env_variable_leak_social_network": lambda: EnvVariableLeak(
+            "missing_configmap_social_network": lambda: MissingConfigMap(
                 app_name="social_network", faulty_service="media-mongodb"
             ),
-            "env_variable_leak_hotel_reservation": lambda: EnvVariableLeak(
+            "missing_configmap_hotel_reservation": lambda: MissingConfigMap(
                 app_name="hotel_reservation", faulty_service="mongodb-geo"
             ),
             "configmap_drift_hotel_reservation": lambda: ConfigMapDrift(faulty_service="geo"),
