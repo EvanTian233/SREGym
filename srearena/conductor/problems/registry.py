@@ -1,8 +1,11 @@
+from typing import List
+
 from srearena.conductor.problems.ad_service_failure import AdServiceFailure
 from srearena.conductor.problems.ad_service_high_cpu import AdServiceHighCpu
 from srearena.conductor.problems.ad_service_manual_gc import AdServiceManualGc
 from srearena.conductor.problems.assign_non_existent_node import AssignNonExistentNode
 from srearena.conductor.problems.auth_miss_mongodb import MongoDBAuthMissing
+from srearena.conductor.problems.base import Problem
 from srearena.conductor.problems.cart_service_failure import CartServiceFailure
 from srearena.conductor.problems.configmap_drift import ConfigMapDrift
 from srearena.conductor.problems.container_kill import ChaosMeshContainerKill
@@ -51,6 +54,8 @@ from srearena.conductor.problems.stale_coredns_config import StaleCoreDNSConfig
 from srearena.conductor.problems.storage_user_unregistered import MongoDBUserUnregistered
 from srearena.conductor.problems.taint_no_toleration import TaintNoToleration
 from srearena.conductor.problems.target_port import K8STargetPortMisconfig
+from srearena.conductor.problems.train_ticket_f22 import TrainTicketF22
+from srearena.conductor.problems.trainticket_f17 import TrainTicketF17
 from srearena.conductor.problems.valkey_auth_disruption import ValkeyAuthDisruption
 from srearena.conductor.problems.valkey_memory_disruption import ValkeyMemoryDisruption
 from srearena.conductor.problems.wrong_bin_usage import WrongBinUsage
@@ -89,23 +94,31 @@ class ProblemRegistry:
             "astronomy_shop_ad_service_failure": AdServiceFailure,
             "astronomy_shop_ad_service_high_cpu": AdServiceHighCpu,
             "astronomy_shop_ad_service_manual_gc": AdServiceManualGc,
-            "astronomy_shop_kafka_queue_problems": KafkaQueueProblems,
             "astronomy_shop_cart_service_failure": CartServiceFailure,
-            "astronomy_shop_image_slow_load": ImageSlowLoad,
-            "astronomy_shop_loadgenerator_flood_homepage": LoadGeneratorFloodHomepage,
+            "astronomy_shop_ad_service_image_slow_load": ImageSlowLoad,
             "astronomy_shop_payment_service_failure": PaymentServiceFailure,
             "astronomy_shop_payment_service_unreachable": PaymentServiceUnreachable,
             "astronomy_shop_product_catalog_service_failure": ProductCatalogServiceFailure,
             "astronomy_shop_recommendation_service_cache_failure": RecommendationServiceCacheFailure,
             # ---
             "wrong_bin_usage": WrongBinUsage,
+            "trainticket_f17_nested_sql_select_clause_error": TrainTicketF17,
+            "trainticket_f22_sql_column_name_mismatch_error": TrainTicketF22,
             "taint_no_toleration_social_network": lambda: TaintNoToleration(),
             "missing_service_hotel_reservation": lambda: MissingService(
                 app_name="hotel_reservation", faulty_service="mongodb-rate"
             ),
-            "missing_service_social_network": lambda: MissingService(
-                app_name="social_network", faulty_service="user-service"
+            "kafka_queue_problems_hotel_reservation": lambda: KafkaQueueProblems(
+                app_name="hotel_reservation", faulty_service="memcached-rate"
             ),
+            "loadgenerator_flood_homepage": LoadGeneratorFloodHomepage,
+            "k8s_dns_resolution_failure": ServiceDNSResolutionFailure,
+            "k8s_sidecar_port_conflict": SidecarPortConflict,
+            "k8s_stale_coredns_config": StaleCoreDNSConfig,
+            "k8s_resource_request_too_large": ResourceRequestTooLarge,
+            "k8s_resource_request_too_small": ResourceRequestTooSmall,
+            "k8s_wrong_dns_policy": WrongDNSPolicy,
+            "k8s_wrong_service_selector": WrongServiceSelector,
             "resource_request_too_large": lambda: ResourceRequestTooLarge(
                 app_name="hotel_reservation", faulty_service="mongodb-rate"
             ),
