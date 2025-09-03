@@ -235,6 +235,87 @@ class KubeCtl:
 
             raise Exception(f"[red]Timeout: Namespace '{namespace}' was not deleted within {max_wait} seconds.")
 
+    def delete_job(self, job_name: str = None, label: str = None, namespace: str = 'default'):
+        """Delete a Kubernetes Job."""
+        console = Console()
+        api_instance = client.BatchV1Api()
+        try:
+            if job_name:
+                api_instance.delete_namespaced_job(name=job_name, namespace=namespace, body=client.V1DeleteOptions(propagation_policy="Foreground"))
+                console.log(f"[bold green]Job '{job_name}' deleted successfully.")
+            elif label:
+                # If label is provided, delete jobs by label
+                jobs = api_instance.list_namespaced_job(namespace=namespace, label_selector=label)
+                if jobs.items:
+                    for job in jobs.items:
+                        api_instance.delete_namespaced_job(name=job.metadata.name, namespace=namespace, body=client.V1DeleteOptions(propagation_policy="Foreground"))
+                        console.log(f"[bold green]Job with label '{label}' deleted successfully.")
+                else:
+                    console.log(f"[yellow]No jobs found with label '{label}' in namespace '{namespace}'.")
+            return True
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                console.log(f"[yellow]Job '{job_name}' not found in namespace '{namespace}' (already deleted)")
+                return True 
+            else:
+                console.log(f"[red]Error deleting job '{job_name}': {e}")
+                return False
+        except Exception as e:
+            console.log(f"[red]Unexpected error deleting job '{job_name}': {e}")
+            return False
+
+    def wait_for_job_completion(self, job_name: str, namespace: str='default', timeout: int = 600):
+        """Wait for a Kubernetes Job to complete successfully within a specified timeout."""
+        api_instance = client.BatchV1Api()
+        console = Console()
+        start_time = time.time()
+        
+        console.log(f"[yellow]Waiting for job '{job_name}' to complete...")
+        with console.status("[bold green]Waiting for job to be done...") as status:
+            while time.time() - start_time < timeout:
+                try:
+                    job = api_instance.read_namespaced_job(name=job_name, namespace=namespace)
+
+                    # Check job status
+                    if job.status.conditions:
+                        for condition in job.status.conditions:
+                            if condition.type == "Complete" and condition.status == "True":
+                                console.log(f"[bold green]Job '{job_name}' completed successfully!")
+                                return True
+                            elif condition.type == "Failed" and condition.status == "True":
+                                console.log(f"[bold red]Job '{job_name}' failed!")
+                                console.log(f"[red]Failure reason: {condition.reason}")
+                                console.log(f"[red]Failure message: {condition.message}")
+                                return False
+
+                    # Check numeric status
+                    succeeded = job.status.succeeded or 0
+                    failed = job.status.failed or 0
+                    active = job.status.active or 0
+                    
+                    if succeeded > 0:
+                        console.log(f"[bold green]Job '{job_name}' completed successfully! (succeeded: {succeeded})")
+                        return True
+                    elif failed > 0:
+                        console.log(f"[bold red]Job '{job_name}' failed! (failed: {failed})")
+                        return False
+                    
+                    time.sleep(2)
+                    
+                except client.exceptions.ApiException as e:
+                    if e.status == 404:
+                        console.log(f"[red]Job '{job_name}' not found!")
+                        return False
+                    else:
+                        console.log(f"[red]Error checking job status: {e}")
+                        time.sleep(2)
+                except Exception as e:
+                    console.log(f"[red]Unexpected error: {e}")
+                    time.sleep(2)
+            
+            console.log(f"[bold red]Timeout waiting for job '{job_name}' to complete!")
+        return False
+
     def update_deployment(self, name: str, namespace: str, deployment):
         """Update the deployment configuration."""
         return self.apps_v1_api.replace_namespaced_deployment(name, namespace, deployment)
