@@ -12,6 +12,7 @@ from srearena.service.kubectl import KubeCtl
 from srearena.utils.decorators import mark_fault_injected
 
 
+# TODO: Need to implement all corresponding oracle wrappers
 class MultipleIndependentFailures(Problem):
     def __init__(self, problems: list[Problem]):
         self.problems = problems
@@ -26,7 +27,7 @@ class MultipleIndependentFailures(Problem):
         for p in self.problems:
             p.inject_fault()
             time.sleep(2)
-        self.faults_str = " | ".join([f"{p.__name__}" for p in self.problems])
+        self.faults_str = " | ".join([f"{p.__class__.__name__}" for p in self.problems])
         print(
             f"Injecting Fault: Multiple faults from included problems: [{self.faults_str}]| Namespace: {self.namespaces}\n"
         )
