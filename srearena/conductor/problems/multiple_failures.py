@@ -24,6 +24,7 @@ class MultipleIndependentFailures(Problem):
         # === Attaching problem's oracles ===
         localization_oracles = [p.localization_oracle for p in self.problems]
         if len(localization_oracles) > 0:
+            print(f"[MIF] Localization oracles: {localization_oracles}")
             self.localization_oracle = CompoundedOracle(
                 self,
                 *localization_oracles
@@ -31,6 +32,7 @@ class MultipleIndependentFailures(Problem):
 
         mitigation_oracles = [p.mitigation_oracle for p in self.problems]
         if len(mitigation_oracles) > 0:
+            print(f"[MIF] Mitigation oracles: {mitigation_oracles}")
             self.mitigation_oracle = CompoundedOracle(
                 self,
                 *mitigation_oracles
@@ -40,6 +42,7 @@ class MultipleIndependentFailures(Problem):
     def inject_fault(self):
         print("== Fault Injection ==")
         for p in self.problems:
+            print(f"Injecting Fault: {p.__class__.__name__} | Namespace: {p.namespace}")
             p.inject_fault()
             time.sleep(2)
         self.faults_str = " | ".join([f"{p.__class__.__name__}" for p in self.problems])
@@ -51,6 +54,7 @@ class MultipleIndependentFailures(Problem):
     def recover_fault(self):
         print("== Fault Recovery ==")
         for p in self.problems:
+            print(f"Recovering Fault: {p.__class__.__name__} | Namespace: {p.namespace}")
             p.recover_fault()
             time.sleep(2)
         print(
