@@ -45,7 +45,7 @@ class MultipleIndependentFailures(Problem):
             time.sleep(2)
         self.faults_str = " | ".join([f"{p.__class__.__name__}" for p in self.problems])
         print(
-            f"Injecting Fault: Multiple faults from included problems: [{self.faults_str}]| Namespace: {self.namespaces}\n"
+            f"Injecting Fault: Multiple faults from included problems: [{self.faults_str}] | Namespace: {self.namespaces}\n"
         )
 
     @mark_fault_injected
@@ -55,5 +55,5 @@ class MultipleIndependentFailures(Problem):
             p.recover_fault()
             time.sleep(2)
         print(
-            f"Recovering Fault: Multiple faults from included problems: [{self.faults_str}]| Namespace: {self.namespaces}\n"
+            f"Recovering Fault: Multiple faults from included problems: [{self.faults_str}] | Namespace: {self.namespaces}\n"
         )
