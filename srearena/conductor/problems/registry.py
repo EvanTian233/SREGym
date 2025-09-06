@@ -239,12 +239,12 @@ class ProblemRegistry:
             "social_network_mega_problem": lambda: MultipleIndependentFailures(
                 problems=[
                     K8STargetPortMisconfig(faulty_service="user-service"),  # SocialNet
-                    MongoDBAuthMissing,  # SocialNet
-                    ScalePodSocialNet,  # SocialNet
-                    AssignNonExistentNode,  # SocialNet
-                    PodAntiAffinityDeadlock,  # SocialNet
+                    MongoDBAuthMissing(),  # SocialNet
+                    ScalePodSocialNet(),  # SocialNet
+                    AssignNonExistentNode(),  # SocialNet
+                    PodAntiAffinityDeadlock(),  # SocialNet
                     TaintNoToleration(),  # SocialNet
-                    PersistentVolumeAffinityViolation,  # SocialNet
+                    # PersistentVolumeAffinityViolation(),  # SocialNet # this problem fail to recover
                     WrongServiceSelector(
                         app_name="social_network", faulty_service="user-service"
                     ),
@@ -276,117 +276,6 @@ class ProblemRegistry:
                     RollingUpdateMisconfigured(
                         app_name="social_network"
                     ),
-                ]
-            ),
-            "hotel_reservation_mega_problem": lambda: MultipleIndependentFailures(
-                problems=[
-                    MongoDBRevokeAuth(faulty_service="mongodb-geo"),  # HotelRes
-                    MongoDBRevokeAuth(faulty_service="mongodb-rate"),  # HotelRes
-                    MongoDBUserUnregistered(faulty_service="mongodb-geo"),  # HotelRes
-                    MongoDBUserUnregistered(faulty_service="mongodb-rate"),  # HotelRes
-                    MisconfigAppHotelRes,  # HotelRes
-                    ChaosMeshContainerKill,  # HotelRes
-                    ChaosMeshPodFailure,  # HotelRes
-                    ChaosMeshPodKill,  # HotelRes
-                    ChaosMeshNetworkLoss,  # HotelRes
-                    ChaosMeshNetworkDelay,  # HotelRes
-                    WrongBinUsage,  # HotelRes
-                    IngressMisroute(
-                        path="/api", correct_service="frontend-service", wrong_service="recommendation-service"
-                    ),  # HotelRes
-                    NamespaceMemoryLimit,  # HotelRes
-                    PVCClaimMismatch,  # HotelRes
-                    ReadError,  # HotelRes
-                    MissingService(
-                        app_name="hotel_reservation", faulty_service="mongodb-rate"
-                    ),
-                    ResourceRequestTooLarge(
-                        app_name="hotel_reservation", faulty_service="mongodb-rate"
-                    ),
-                    ResourceRequestTooSmall(
-                        app_name="hotel_reservation", faulty_service="mongodb-rate"
-                    ),
-                    WrongDNSPolicy(
-                        app_name="hotel_reservation", faulty_service="profile"
-                    ),
-                    SidecarPortConflict(
-                        app_name="hotel_reservation", faulty_service="frontend"
-                    ),
-                    EnvVariableLeak(
-                        app_name="hotel_reservation", faulty_service="mongodb-geo"
-                    ),
-                    ConfigMapDrift(faulty_service="geo"),
-                    ReadinessProbeMisconfiguration(
-                        app_name="hotel_reservation", faulty_service="frontend"
-                    ),
-                    LivenessProbeMisconfiguration(
-                        app_name="hotel_reservation", faulty_service="recommendation"
-                    ),
-                    LivenessProbeTooAggressive(
-                        app_name="hotel_reservation"
-                    ),
-                    DuplicatePVCMounts(
-                        app_name="hotel_reservation", faulty_service="frontend"
-                    ),
-                    RollingUpdateMisconfigured(
-                        app_name="hotel_reservation"
-                    ),
-                ]
-            ),
-            "astronomy_shop_mega_problem": lambda: MultipleIndependentFailures(
-                problems=[
-                    ChaosMeshNetworkPartition,  # AstroShop
-                    ChaosMeshHttpAbort,  # AstroShop
-                    ChaosMeshCPUStress,  # AstroShop
-                    ChaosMeshJVMHeapStress,  # AstroShop
-                    ChaosMeshJVMReturnFault,  # AstroShop
-                    ChaosMeshMemoryStress,  # AstroShop
-                    ChaosMeshHttpPostTamper,  # AstroShop
-                    LoadGeneratorFloodHomepage,  # AstroShop
-                    ServiceDNSResolutionFailure,  # AstroShop
-                    SidecarPortConflict,  # AstroShop
-                    StaleCoreDNSConfig,  # AstroShop
-                    WrongDNSPolicy,  # AstroShop
-                    ValkeyAuthDisruption,  # AstroShop
-                    ValkeyMemoryDisruption,  # AstroShop
-                    IncorrectPortAssignment,  # AstroShop
-                    IncorrectImage,  # AstroShop
-                    MissingService(app_name="astronomy_shop", faulty_service="ad"),
-                    AdServiceFailure,
-                    AdServiceHighCpu,
-                    AdServiceManualGc,
-                    CartServiceFailure,
-                    ImageSlowLoad,
-                    PaymentServiceFailure,
-                    PaymentServiceUnreachable,
-                    ProductCatalogServiceFailure,
-                    RecommendationServiceCacheFailure,
-                    WrongServiceSelector(
-                        app_name="astronomy_shop", faulty_service="frontend"
-                    ),
-                    ServiceDNSResolutionFailure(
-                        app_name="astronomy_shop", faulty_service="frontend"
-                    ),
-                    WrongDNSPolicy(
-                        app_name="astronomy_shop", faulty_service="frontend"
-                    ),
-                    StaleCoreDNSConfig(app_name="astronomy_shop"),
-                    SidecarPortConflict(
-                        app_name="astronomy_shop", faulty_service="frontend"
-                    ),
-                    ReadinessProbeMisconfiguration(
-                        app_name="astronomy_shop", faulty_service="frontend"
-                    ),
-                    LivenessProbeMisconfiguration(
-                        app_name="astronomy_shop", faulty_service="frontend"
-                    ),
-                    LivenessProbeTooAggressive(
-                        app_name="astronomy_shop"
-                    ),
-                    DuplicatePVCMounts(
-                        app_name="astronomy_shop", faulty_service="frontend"
-                    ),
-                    EnvVariableShadowing(),
                 ]
             ),
             # K8S operator misoperation -> Refactor later, not sure if they're working
