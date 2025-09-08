@@ -12,28 +12,30 @@ class IncorrectImage(Problem):
         self.app = AstronomyShop()
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
-        self.faulty_service = "product-catalog"
+        self.faulty_services = ["product-catalog"]
         self.injector = ApplicationFaultInjector(namespace=self.namespace)
         super().__init__(app=self.app, namespace=self.namespace)
 
-        self.localization_oracle = LocalizationOracle(problem=self, expected=[self.faulty_service])
-        self.mitigation_oracle = IncorrectImageMitigationOracle(problem=self, actual_images={self.faulty_service: "app-image:latest"})
+        self.localization_oracle = LocalizationOracle(problem=self, expected=self.faulty_services)
+        self.mitigation_oracle = IncorrectImageMitigationOracle(problem=self, actual_images={"product-catalog": "app-image:latest"})
 
         self.app.create_workload()
 
     @mark_fault_injected
     def inject_fault(self):
         print("== Fault Injection ==")
-        self.injector.inject_incorrect_image(
-            deployment_name=self.faulty_service, namespace=self.namespace, bad_image="app-image:latest"
-        )
-        print(f"Service: {self.faulty_service} | Namespace: {self.namespace}\n")
+        for service in self.faulty_services:
+            self.injector.inject_incorrect_image(
+                deployment_name=service, namespace=self.namespace, bad_image="app-image:latest"
+            )
+            print(f"Service: {service} | Namespace: {self.namespace}\n")
 
     @mark_fault_injected
     def recover_fault(self):
         print("== Fault Recovery ==")
-        self.injector.recover_incorrect_image(
-            deployment_name=self.faulty_service,
-            namespace=self.namespace,
-            correct_image="ghcr.io/open-telemetry/demo:2.0.2-productcatalogservice",
-        )
+        for service in self.faulty_services:
+            self.injector.recover_incorrect_image(
+                deployment_name=service,
+                namespace=self.namespace,
+                correct_image="ghcr.io/open-telemetry/demo:2.0.2-productcatalogservice",
+            )
