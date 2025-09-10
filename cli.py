@@ -20,6 +20,8 @@ from rich.panel import Panel
 
 from srearena.conductor.conductor import Conductor
 from srearena.service.shell import Shell
+from srearena.agent_registry import AgentRegistration, save_agent, list_agents, get_agent
+from srearena.agent_launcher import AgentLauncher
 
 WELCOME = """
 # SREArena
@@ -54,6 +56,14 @@ class HumanAgent:
             match_middle=True,
             sentence=True,
         )
+        self.launcher = AgentLauncher()
+        self.completer = WordCompleter(
+            ["list", "options", "exit", "agents", "register-agent", "kickoff-agent"] + [f"start {pid}" for pid in self.pids],
+            ignore_case=True,
+            match_middle=True,
+            sentence=True,
+)
+
         self.session_purpose = None  # "problem", "exit", etc.
 
     def display_welcome(self):
@@ -86,6 +96,43 @@ class HumanAgent:
                 self.session_purpose = "problem"
                 return
             self.console.print("[red]Invalid command. Type `options` to see choices.")
+
+
+            if cmd[0].lower() == "agents":
+                regs = list_agents()
+                if not regs:
+                    self.console.print("No registered agents.")
+                else:
+                    lines = [f"- {name}: kickoff={regs[name].kickoff_command!r}" for name in regs]
+                    self.console.print(Panel("\n".join(lines), title="Registered Agents"))
+                continue
+
+            if cmd[0].lower() == "register-agent" and len(cmd) == 2:
+                # Expect JSON: {"name":"stratus","kickoff_command":"python -m ...","kickoff_workdir":".","kickoff_env":{"KUBECONFIG":"$KUBECONFIG"}}
+                try:
+                    data = json.loads(cmd[1])
+                    reg = AgentRegistration(
+                        name=data["name"],
+                        kickoff_command=data.get("kickoff_command"),
+                        kickoff_workdir=data.get("kickoff_workdir"),
+                        kickoff_env=data.get("kickoff_env"),
+                    )
+                    save_agent(reg)
+                    self.console.print(f"[green]Registered agent '{reg.name}'.[/green]")
+                except Exception as e:
+                    self.console.print(f"[red]Bad register-agent payload: {e}[/red]")
+                continue
+
+            if cmd[0].lower() == "kickoff-agent" and len(cmd) == 2:
+                name = cmd[1]
+                reg = get_agent(name)
+                if not reg:
+                    self.console.print(f"[red]No agent named '{name}' in registry.[/red]")
+                    continue
+                await self.launcher.ensure_started(reg)
+                self.console.print(f"[green]Kicked off agent '{name}'.[/green]")
+                continue
+
 
     async def interactive_loop(self):
         """Once problem is started, repeatedly shell or submit until done."""

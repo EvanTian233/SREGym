@@ -4,6 +4,9 @@ import sys
 import threading
 import time
 from datetime import datetime
+import os
+from srearena.agent_registry import get_agent
+from srearena.agent_launcher import AgentLauncher
 
 import uvicorn
 from rich.console import Console
@@ -14,6 +17,8 @@ from mcp_server.configs.load_all_cfg import mcp_server_cfg
 from mcp_server.srearena_mcp_server import app as mcp_app
 from srearena.conductor.conductor import Conductor
 from srearena.conductor.conductor_api import request_shutdown, run_api
+
+LAUNCHER = AgentLauncher()
 
 
 def get_current_datetime_formatted():
@@ -39,6 +44,10 @@ def driver_loop(conductor: Conductor):
             conductor.problem_id = pid
 
             await conductor.start_problem()
+            agent_to_start = os.environ.get("SREARENA_AGENT", "stratus")
+            reg = get_agent(agent_to_start)
+            if reg:
+                await LAUNCHER.ensure_started(reg)
 
             # await stratus_driver()
 
