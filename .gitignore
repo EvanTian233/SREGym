@@ -751,4 +751,7 @@ provisioner_ssh_key
 provisioner_ssh_key.pub
 agent_graph.png
 
+# Ignore tasklist 
+srearena/conductor/tasklist.yml
+
 kubeconfig.yaml

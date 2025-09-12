@@ -6,6 +6,7 @@ from srearena.service.apps.fleet_cast import FleetCast
 from srearena.service.apps.flight_ticket import FlightTicket
 from srearena.service.apps.hotel_reservation import HotelReservation
 from srearena.service.apps.social_network import SocialNetwork
+from srearena.service.apps.blueprint_hotel_reservation import BlueprintHotelReservation
 from srearena.service.helm import Helm
 
 # from srearena.service.apps.train_ticket import TrainTicket
@@ -20,6 +21,7 @@ class AppRegistry:
             "Social Network": SocialNetwork,
             # "Train Ticket": TrainTicket
             "Fleet Cast": FleetCast,
+            "Blueprint Hotel Reservation": BlueprintHotelReservation
         }
 
         self.APP_PATH = {
@@ -29,6 +31,7 @@ class AppRegistry:
             "Social Network": SOCIAL_NETWORK_METADATA,
             # "Train Ticket": TRAIN_TICKET_METADATA
             "Fleet Cast": FLEET_CAST_METADATA,
+            "Blueprint Hotel Reservation": BLUEPRINT_HOTEL_RES_METADATA
         }
 
     def get_app_instance(self, app_name: str):

@@ -1,15 +1,18 @@
+from typing import List
+
 from srearena.conductor.problems.ad_service_failure import AdServiceFailure
 from srearena.conductor.problems.ad_service_high_cpu import AdServiceHighCpu
 from srearena.conductor.problems.ad_service_manual_gc import AdServiceManualGc
 from srearena.conductor.problems.assign_non_existent_node import AssignNonExistentNode
 from srearena.conductor.problems.auth_miss_mongodb import MongoDBAuthMissing
+from srearena.conductor.problems.base import Problem
 from srearena.conductor.problems.cart_service_failure import CartServiceFailure
 from srearena.conductor.problems.configmap_drift import ConfigMapDrift
 from srearena.conductor.problems.container_kill import ChaosMeshContainerKill
 from srearena.conductor.problems.cpu_stress import ChaosMeshCPUStress
 from srearena.conductor.problems.duplicate_pvc_mounts import DuplicatePVCMounts
-from srearena.conductor.problems.env_variable_leak import EnvVariableLeak
 from srearena.conductor.problems.env_variable_shadowing import EnvVariableShadowing
+from srearena.conductor.problems.faulty_image_correlated import FaultyImageCorrelated
 from srearena.conductor.problems.http_abort import ChaosMeshHttpAbort
 from srearena.conductor.problems.http_post_tamper import ChaosMeshHttpPostTamper
 from srearena.conductor.problems.image_slow_load import ImageSlowLoad
@@ -24,7 +27,10 @@ from srearena.conductor.problems.liveness_probe_too_aggressive import LivenessPr
 from srearena.conductor.problems.loadgenerator_flood_homepage import LoadGeneratorFloodHomepage
 from srearena.conductor.problems.memory_stress import ChaosMeshMemoryStress
 from srearena.conductor.problems.misconfig_app import MisconfigAppHotelRes
+from srearena.conductor.problems.missing_configmap import MissingConfigMap
+from srearena.conductor.problems.missing_env_variable import MissingEnvVariable
 from srearena.conductor.problems.missing_service import MissingService
+from srearena.conductor.problems.multiple_failures import MultipleIndependentFailures
 from srearena.conductor.problems.namespace_memory_limit import NamespaceMemoryLimit
 from srearena.conductor.problems.network_delay import ChaosMeshNetworkDelay
 from srearena.conductor.problems.network_loss import ChaosMeshNetworkLoss
@@ -38,11 +44,13 @@ from srearena.conductor.problems.pod_failure import ChaosMeshPodFailure
 from srearena.conductor.problems.pod_kill import ChaosMeshPodKill
 from srearena.conductor.problems.product_catalog_failure import ProductCatalogServiceFailure
 from srearena.conductor.problems.pvc_claim_mismatch import PVCClaimMismatch
+from srearena.conductor.problems.read_error import ReadError
 from srearena.conductor.problems.readiness_probe_misconfiguration import ReadinessProbeMisconfiguration
 from srearena.conductor.problems.recommendation_service_cache_failure import RecommendationServiceCacheFailure
 from srearena.conductor.problems.resource_request import ResourceRequestTooLarge, ResourceRequestTooSmall
 from srearena.conductor.problems.revoke_auth import MongoDBRevokeAuth
 from srearena.conductor.problems.rolling_update_misconfigured import RollingUpdateMisconfigured
+from srearena.conductor.problems.rpc_retry_storm import RPCRetryStorm
 from srearena.conductor.problems.scale_pod import ScalePodSocialNet
 from srearena.conductor.problems.service_dns_resolution_failure import ServiceDNSResolutionFailure
 from srearena.conductor.problems.sidecar_port_conflict import SidecarPortConflict
@@ -50,11 +58,15 @@ from srearena.conductor.problems.stale_coredns_config import StaleCoreDNSConfig
 from srearena.conductor.problems.storage_user_unregistered import MongoDBUserUnregistered
 from srearena.conductor.problems.taint_no_toleration import TaintNoToleration
 from srearena.conductor.problems.target_port import K8STargetPortMisconfig
+from srearena.conductor.problems.train_ticket_f22 import TrainTicketF22
+from srearena.conductor.problems.trainticket_f17 import TrainTicketF17
+from srearena.conductor.problems.update_incompatible_correlated import UpdateIncompatibleCorrelated
 from srearena.conductor.problems.valkey_auth_disruption import ValkeyAuthDisruption
 from srearena.conductor.problems.valkey_memory_disruption import ValkeyMemoryDisruption
 from srearena.conductor.problems.wrong_bin_usage import WrongBinUsage
 from srearena.conductor.problems.wrong_dns_policy import WrongDNSPolicy
 from srearena.conductor.problems.wrong_service_selector import WrongServiceSelector
+from srearena.service.kubectl import KubeCtl
 from srearena.conductor.problems.operator_misoperation.security_context_fault import K8SOperatorSecurityContextFault
 from srearena.conductor.problems.operator_misoperation.wrong_update_strategy import K8SOperatorWrongUpdateStrategyFault
 from srearena.conductor.problems.operator_misoperation.invalid_affinity_toleration import K8SOperatorInvalidAffinityTolerationFault
@@ -63,43 +75,41 @@ from srearena.conductor.problems.operator_misoperation.non_existent_storage impo
 class ProblemRegistry:
     def __init__(self):
         self.PROBLEM_REGISTRY = {
-            #  "k8s_target_port-misconfig": lambda: K8STargetPortMisconfig(faulty_service="user-service"),
-            #  "auth_miss_mongodb": MongoDBAuthMissing,
-            #  "revoke_auth_mongodb-1": lambda: MongoDBRevokeAuth(faulty_service="mongodb-geo"),
+            # "k8s_target_port-misconfig": lambda: K8STargetPortMisconfig(faulty_service="user-service"),
+            # "auth_miss_mongodb": MongoDBAuthMissing,
+            # "revoke_auth_mongodb-1": lambda: MongoDBRevokeAuth(faulty_service="mongodb-geo"),
             # "revoke_auth_mongodb-2": lambda: MongoDBRevokeAuth(faulty_service="mongodb-rate"),
-            #  "storage_user_unregistered-1": lambda: MongoDBUserUnregistered(faulty_service="mongodb-geo"),
-            #  "storage_user_unregistered-2": lambda: MongoDBUserUnregistered(faulty_service="mongodb-rate"),
-            #  "misconfig_app_hotel_res": MisconfigAppHotelRes,
-            #  "scale_pod_zero_social_net": ScalePodSocialNet,
-            #  "assign_to_non_existent_node": AssignNonExistentNode,
-            #  "pod_anti_affinity_deadlock": PodAntiAffinityDeadlock,
-            # # --- Chaos Mesh problems (No mitigation oracle)
-            # "chaos_mesh_container_kill": ChaosMeshContainerKill,
-            # "chaos_mesh_pod_failure": ChaosMeshPodFailure,
-            # "chaos_mesh_pod_kill": ChaosMeshPodKill,
-            # "chaos_mesh_network_loss": ChaosMeshNetworkLoss,
-            # "chaos_mesh_network_delay": ChaosMeshNetworkDelay,
-            # "chaos_mesh_network_partition": ChaosMeshNetworkPartition,
-            # "chaos_mesh_http_abort": ChaosMeshHttpAbort,
-            # "chaos_mesh_cpu_stress": ChaosMeshCPUStress,
-            # "chaos_mesh_jvm_stress": ChaosMeshJVMHeapStress,
-            # "chaos_mesh_jvm_return": ChaosMeshJVMReturnFault,
-            # "chaos_mesh_memory_stress": ChaosMeshMemoryStress,
-            # "chaos_mesh_http_post_tamper": ChaosMeshHttpPostTamper,
-            # # ---
-            # # --- Astro shop problems with no mitigation oracle
-            # "astronomy_shop_ad_service_failure": AdServiceFailure,
-            # "astronomy_shop_ad_service_high_cpu": AdServiceHighCpu,
-            # "astronomy_shop_ad_service_manual_gc": AdServiceManualGc,
-            # "astronomy_shop_kafka_queue_problems": KafkaQueueProblems,
-            # "astronomy_shop_cart_service_failure": CartServiceFailure,
-            # "astronomy_shop_image_slow_load": ImageSlowLoad,
-            # "astronomy_shop_loadgenerator_flood_homepage": LoadGeneratorFloodHomepage,
-            # "astronomy_shop_payment_service_failure": PaymentServiceFailure,
-            # "astronomy_shop_payment_service_unreachable": PaymentServiceUnreachable,
-            # "astronomy_shop_product_catalog_service_failure": ProductCatalogServiceFailure,
-            # "astronomy_shop_recommendation_service_cache_failure": RecommendationServiceCacheFailure,
-            # # ---
+            # "storage_user_unregistered-1": lambda: MongoDBUserUnregistered(faulty_service="mongodb-geo"),
+            # "storage_user_unregistered-2": lambda: MongoDBUserUnregistered(faulty_service="mongodb-rate"),
+            # "misconfig_app_hotel_res": MisconfigAppHotelRes,
+            # "scale_pod_zero_social_net": ScalePodSocialNet,
+            # "assign_to_non_existent_node": AssignNonExistentNode,
+            # "pod_anti_affinity_deadlock": PodAntiAffinityDeadlock,
+            # --- Chaos Mesh problems (No mitigation oracle)
+            "chaos_mesh_container_kill": ChaosMeshContainerKill,
+            "chaos_mesh_pod_failure": ChaosMeshPodFailure,
+            "chaos_mesh_pod_kill": ChaosMeshPodKill,
+            "chaos_mesh_network_loss": ChaosMeshNetworkLoss,
+            "chaos_mesh_network_delay": ChaosMeshNetworkDelay,
+            "chaos_mesh_network_partition": ChaosMeshNetworkPartition,
+            "chaos_mesh_http_abort": ChaosMeshHttpAbort,
+            "chaos_mesh_cpu_stress": ChaosMeshCPUStress,
+            "chaos_mesh_jvm_stress": ChaosMeshJVMHeapStress,
+            "chaos_mesh_jvm_return": ChaosMeshJVMReturnFault,
+            "chaos_mesh_memory_stress": ChaosMeshMemoryStress,
+            "chaos_mesh_http_post_tamper": ChaosMeshHttpPostTamper,
+            # ---
+            # --- Astro shop problems with no mitigation oracle
+            "astronomy_shop_ad_service_failure": AdServiceFailure,
+            "astronomy_shop_ad_service_high_cpu": AdServiceHighCpu,
+            "astronomy_shop_ad_service_manual_gc": AdServiceManualGc,
+            "astronomy_shop_cart_service_failure": CartServiceFailure,
+            "astronomy_shop_ad_service_image_slow_load": ImageSlowLoad,
+            "astronomy_shop_payment_service_failure": PaymentServiceFailure,
+            "astronomy_shop_payment_service_unreachable": PaymentServiceUnreachable,
+            "astronomy_shop_product_catalog_service_failure": ProductCatalogServiceFailure,
+            "astronomy_shop_recommendation_service_cache_failure": RecommendationServiceCacheFailure,
+            # ---
             # "wrong_bin_usage": WrongBinUsage,
             # "taint_no_toleration_social_network": lambda: TaintNoToleration(),
             # "missing_service_hotel_reservation": lambda: MissingService(
@@ -114,21 +124,21 @@ class ProblemRegistry:
             # "resource_request_too_small": lambda: ResourceRequestTooSmall(
             #     app_name="hotel_reservation", faulty_service="mongodb-rate"
             # ),
-            # "wrong_service_selector_astronomy_shop": lambda: WrongServiceSelector(
-            #     app_name="astronomy_shop", faulty_service="frontend"
-            # ),
-            # "wrong_service_selector_hotel_reservation": lambda: WrongServiceSelector(
-            #     app_name="hotel_reservation", faulty_service="frontend"
-            # ),
-            # "wrong_service_selector_social_network": lambda: WrongServiceSelector(
-            #     app_name="social_network", faulty_service="user-service"
-            # ),
-            # "service_dns_resolution_failure_astronomy_shop": lambda: ServiceDNSResolutionFailure(
-            #     app_name="astronomy_shop", faulty_service="frontend"
-            # ),
-            # "service_dns_resolution_failure_social_network": lambda: ServiceDNSResolutionFailure(
-            #     app_name="social_network", faulty_service="user-service"
-            # ),
+            "wrong_service_selector_astronomy_shop": lambda: WrongServiceSelector(
+                app_name="astronomy_shop", faulty_service="frontend"
+            ),
+            "wrong_service_selector_hotel_reservation": lambda: WrongServiceSelector(
+                app_name="hotel_reservation", faulty_service="frontend"
+            ),
+            "wrong_service_selector_social_network": lambda: WrongServiceSelector(
+                app_name="social_network", faulty_service="user-service"
+            ),
+            "service_dns_resolution_failure_astronomy_shop": lambda: ServiceDNSResolutionFailure(
+                app_name="astronomy_shop", faulty_service="frontend"
+            ),
+            "service_dns_resolution_failure_social_network": lambda: ServiceDNSResolutionFailure(
+                app_name="social_network", faulty_service="user-service"
+            ),
             # "wrong_dns_policy_astronomy_shop": lambda: WrongDNSPolicy(
             #     app_name="astronomy_shop", faulty_service="frontend"
             # ),
@@ -146,9 +156,9 @@ class ProblemRegistry:
             # "sidecar_port_conflict_social_network": lambda: SidecarPortConflict(
             #     app_name="social_network", faulty_service="user-service"
             # ),
-            # "sidecar_port_conflict_hotel_reservation": lambda: SidecarPortConflict(
-            #     app_name="hotel_reservation", faulty_service="frontend"
-            # ),
+            "sidecar_port_conflict_hotel_reservation": lambda: SidecarPortConflict(
+                app_name="hotel_reservation", faulty_service="frontend"
+            ),
             # "env_variable_leak_social_network": lambda: EnvVariableLeak(
             #     app_name="social_network", faulty_service="media-mongodb"
             # ),
@@ -162,12 +172,12 @@ class ProblemRegistry:
             # "readiness_probe_misconfiguration_social_network": lambda: ReadinessProbeMisconfiguration(
             #     app_name="social_network", faulty_service="user-service"
             # ),
-            # "readiness_probe_misconfiguration_hotel_reservation": lambda: ReadinessProbeMisconfiguration(
-            #     app_name="hotel_reservation", faulty_service="frontend"
-            # ),
-            # "liveness_probe_misconfiguration_astronomy_shop": lambda: LivenessProbeMisconfiguration(
-            #     app_name="astronomy_shop", faulty_service="frontend"
-            # ),
+            "readiness_probe_misconfiguration_hotel_reservation": lambda: ReadinessProbeMisconfiguration(
+                app_name="hotel_reservation", faulty_service="frontend"
+            ),
+            "liveness_probe_misconfiguration_astronomy_shop": lambda: LivenessProbeMisconfiguration(
+                app_name="astronomy_shop", faulty_service="frontend"
+            ),
             # "liveness_probe_misconfiguration_social_network": lambda: LivenessProbeMisconfiguration(
             #     app_name="social_network", faulty_service="user-service"
             # ),
@@ -205,14 +215,15 @@ class ProblemRegistry:
             # ),
             # "persistent_volume_affinity_violation": PersistentVolumeAffinityViolation,
             # "valkey_auth_disruption": ValkeyAuthDisruption,
-            # # --- valkey problem w/o mitigation oracle
+            # --- valkey problem w/o mitigation oracle
             # "valkey_memory_disruption": ValkeyMemoryDisruption,
-            # # ---
+            # ---
+            # these two below are also astro shop
             # "incorrect_port_assignment": IncorrectPortAssignment,
             # "incorrect_image": IncorrectImage,
             # "namespace_memory_limit": NamespaceMemoryLimit,
             # "pvc_claim_mismatch": PVCClaimMismatch,
-            # "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
+            "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
             # K8S operator misoperation -> Refactor later, not sure if they're working
             # They will also need to be updated to the new problem format.
             #"operator_overload_replicas": K8SOperatorOverloadReplicasFault,
@@ -221,11 +232,25 @@ class ProblemRegistry:
             "operator_security_context_fault": K8SOperatorSecurityContextFault,
             # "operator_wrong_update_strategy_fault": K8SOperatorWrongUpdateStrategyFault,
           
+            "rpc_retry_storm": RPCRetryStorm,
+            "social_net_hotel_res_astro_shop_concurrent_failures": lambda: MultipleIndependentFailures(
+                problems=[
+                    K8STargetPortMisconfig(faulty_service="user-service"),
+                    MongoDBRevokeAuth(faulty_service="mongodb-geo"),
+                    WrongServiceSelector(),
+                ]
+            ),
         }
+        self.kubectl = KubeCtl()
+        self.non_emulated_cluster_problems = ["rpc_retry_storm"]
 
     def get_problem_instance(self, problem_id: str):
         if problem_id not in self.PROBLEM_REGISTRY:
             raise ValueError(f"Problem ID {problem_id} not found in registry.")
+
+        is_emulated_cluster = self.kubectl.is_emulated_cluster()
+        if is_emulated_cluster and problem_id in self.non_emulated_cluster_problems:
+            raise RuntimeError(f"Problem ID {problem_id} is not supported in emulated clusters.")
 
         return self.PROBLEM_REGISTRY.get(problem_id)()
 
