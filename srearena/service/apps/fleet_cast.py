@@ -10,6 +10,7 @@ from srearena.service.kubectl import KubeCtl
 import yaml
 from pathlib import Path
 from srearena.service.apps.tidb_cluster_operator import TiDBClusterDeployer
+from srearena.service.apps import tidb_prometheus
 
 class FleetCast(Application):
     def __init__(self):
@@ -43,6 +44,8 @@ class FleetCast(Application):
 
         Helm.install(**self.helm_configs)
         Helm.assert_if_deployed(self.helm_configs["namespace"])
+        tidb_prometheus.main()
+
 
     def delete(self):
         """Delete the Helm configurations."""

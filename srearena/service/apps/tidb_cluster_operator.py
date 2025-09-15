@@ -4,10 +4,10 @@ import subprocess
 
 from pathlib import Path
 from textwrap import dedent
-
+from srearena.service.apps import tidb_prometheus
 from srearena.paths import BASE_DIR
 import os
-#This script deploys a TIDB Cluster, configuring it to the FleetCast TiDB application.
+
 class TiDBClusterDeployer:
     def __init__(self, metadata_path):
         with open(metadata_path, "r") as f:
