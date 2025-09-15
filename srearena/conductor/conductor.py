@@ -8,6 +8,7 @@ import yaml
 from srearena.conductor.oracles.detection import DetectionOracle
 from srearena.conductor.problems.registry import ProblemRegistry
 from srearena.conductor.utils import is_ordered_subset
+from srearena.generators.fault.inject_remote_os import RemoteOSFaultInjector
 from srearena.service.apps.app_registry import AppRegistry
 from srearena.service.khaos import KhaosController
 from srearena.service.kubectl import KubeCtl
@@ -164,6 +165,7 @@ class Conductor:
     
     def fix_kubernetes(self):
         print("Fixing Kubernetes...")
+        print("[FIX] Imbalance leftover if any")
         # fix possible interruption of imbalance problem
         daemon_set_yaml = self.kubectl.exec_command(f"kubectl get ds kube-proxy -n kube-system -o yaml")
         daemon_set_yaml = yaml.safe_load(daemon_set_yaml)
@@ -181,6 +183,12 @@ class Conductor:
                             self.kubectl.exec_command(f"kubectl rollout restart ds kube-proxy -n kube-system")
                             self.kubectl.exec_command(f"kubectl rollout status ds kube-proxy -n kube-system --timeout=60s")
                             break
+        print("[FIX] KubeletCrash leftover if any")
+        injector = RemoteOSFaultInjector()
+        info = injector.get_host_info()
+        for host, user in info.items():
+            if injector.exist_script_on_host(host, user, "kill_kubelet.sh"):
+                injector.clean_up_script_on_host(host, user, "kill_kubelet.sh")
 
 
     def deploy_app(self):

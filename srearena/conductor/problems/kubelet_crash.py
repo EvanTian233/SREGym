@@ -10,7 +10,7 @@ class KubeletCrash(Problem):
         self.app = AstronomyShop()
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
-        # self.faulty_services = ["frontend"]
+        self.rollout_services = ["frontend", "frontend-proxy", "currency"]
         self.normal_op = NormalOperationGenerator()
         self.injector = RemoteOSFaultInjector()
         
@@ -24,11 +24,17 @@ class KubeletCrash(Problem):
     def inject_fault(self):
         print("== Fault Injection ==")
         self.injector.inject_kubelet_crash()
-        self.normal_op.trigger_rollout(deployment_name="frontend", namespace=self.namespace)
+        # rollout the services to trigger the failure
+        for service in self.rollout_services:
+            print(f"Rolling out {service}...")
+            self.normal_op.trigger_rollout(deployment_name=service, namespace=self.namespace)
 
     @mark_fault_injected
     def recover_fault(self):
         print("== Fault Recovery ==")
         self.injector.recover_kubelet_crash()
-        self.normal_op.trigger_rollout(deployment_name="frontend", namespace=self.namespace)
+        return
+        for service in self.rollout_services:
+            print(f"Rolling out {service}...")
+            self.normal_op.trigger_rollout(deployment_name=service, namespace=self.namespace)
 
