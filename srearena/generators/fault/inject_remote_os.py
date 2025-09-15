@@ -105,7 +105,7 @@ class RemoteOSFaultInjector(FaultInjector):
         if not self.worker_info:
             return
         for host, user in self.worker_info.items():
-            print(f"Injecting kubelet crash on {host} with user {user}")
+            #print(f"Injecting kubelet crash on {host} with user {user}")
             pid = self.inject_script_on_host(host, user, KILL_KUBELET_SCRIPT, "kill_kubelet.sh")
             if pid:
                 print(f"Successfully started kubelet killer on {host} with PID {pid}")
@@ -117,7 +117,7 @@ class RemoteOSFaultInjector(FaultInjector):
     
     def recover_kubelet_crash(self):
         for host, pid in self.pids.items():
-            print(f"Cleaning up kubelet crash on {host} with PID {pid}")
+            # print(f"Cleaning up kubelet crash on {host} with PID {pid}")
             self.clean_up_script_on_host(host, self.worker_info[host], pid, "kill_kubelet.sh")
         return
         
@@ -139,14 +139,22 @@ class RemoteOSFaultInjector(FaultInjector):
                 f.write(script)
             sftp.close()
             
-            
-            
             # Make the script executable and run it in background
-            cmd = f"chmod +x {script_path} && nohup {script_path} > {log_path} 2>&1 & echo $!"
+            # First make it executable
+            stdin, stdout, stderr = ssh.exec_command(f"chmod +x {script_path}")
+            stdout.channel.recv_exit_status()  # Wait for completion
+            
+            # Then start the script in background and capture PID
+            # Use a more reliable method to get PID
+            cmd = f"nohup {script_path} > {log_path} 2>&1 & echo $! > /tmp/{script_name}.pid"
             stdin, stdout, stderr = ssh.exec_command(cmd)
-            print(f"Executed command {cmd} on {host}")
+            stdout.channel.recv_exit_status()  # Wait for completion
+            
+            # Read the PID from the file
+            stdin, stdout, stderr = ssh.exec_command(f"cat /tmp/{script_name}.pid")
             pid = stdout.readline().strip()
-            print(f"Read PID from stdout: {pid}")
+            print(f"Executed command {cmd} on {host}")
+            print(f"Read PID from file: {pid}")
             print(f"Started {script_name} on {host} with PID {pid}")
             # Store the PID for later cleanup
             return pid
@@ -163,11 +171,12 @@ class RemoteOSFaultInjector(FaultInjector):
         ssh.set_missing_host_key_policy(AutoAddPolicy())
         script_path = f"/tmp/{script_name}"
         log_path = f"/tmp/{script_name}.log"
+        pid_path = f"/tmp/{script_name}.pid"
         
         try:
             ssh.connect(host, username=user)
             # Kill the process and clean up the script
-            cmd = f"kill {pid} 2>/dev/null; rm -f {script_path} {log_path}"
+            cmd = f"kill {pid} 2>/dev/null; rm -f {script_path} {log_path} {pid_path}"
             stdin, stdout, stderr = ssh.exec_command(cmd)
             print(f"Cleaned up {script_name} on {host} (PID {pid})")
         except Exception as e:
