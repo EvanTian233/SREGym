@@ -224,6 +224,9 @@ class ProblemRegistry:
                     WrongServiceSelector(),
                 ]
             ),
+            # ad hoc:
+            "kubelet_crash": KubeletCrash,
+            "workload_imbalance": WorkloadImbalance,
             # ==================== K8S OPERATOR MISOPERATION (COMMENTED OUT) ==================
             # K8S operator misoperation -> Refactor later, not sure if they're working
             # They will also need to be updated to the new problem format.
