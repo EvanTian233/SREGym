@@ -351,6 +351,13 @@ export no_proxy=localhost
 }
 ``` -->
 
+### Dashboard
+
+You can run the dashboard manually, using the command.
+```
+python3 dashboard/dashboard_app.py
+```
+The dashboard will be hosted at localhost:11451 by dafault.
 
 
 ## License
