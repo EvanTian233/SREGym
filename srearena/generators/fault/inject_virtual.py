@@ -1683,6 +1683,196 @@ class VirtualizationFaultInjector(FaultInjector):
         deployment_rollout_command = f"kubectl rollout restart deployment -l configmap={configmap} -n {self.namespace}"
         self.kubectl.exec_command(deployment_rollout_command)
         self.kubectl.wait_for_ready(self.namespace)
+        
+    def inject_daemon_set_image_replacement(self, daemon_set_name: str, new_image: str):
+        daemon_set_yaml = self._get_daemon_set_yaml(daemon_set_name)
+        
+        # print(f"Daemon set yaml: {daemon_set_yaml}")
+        
+        # Replace the image in all containers
+        if "spec" in daemon_set_yaml and "template" in daemon_set_yaml["spec"]:
+            template_spec = daemon_set_yaml["spec"]["template"]["spec"]
+            if "containers" in template_spec:
+                for container in template_spec["containers"]:
+                    if "image" in container:
+                        container["image"] = new_image
+        
+        modified_yaml_path = self._write_yaml_to_file(daemon_set_name, daemon_set_yaml) # backup the yaml
+        
+        self.kubectl.exec_command(f"kubectl apply -f {modified_yaml_path}")
+        self.kubectl.exec_command(f"kubectl rollout restart ds {daemon_set_name} -n {self.namespace}")
+        self.kubectl.exec_command(f"kubectl rollout status ds {daemon_set_name} -n {self.namespace} --timeout=60s")
+        
+    def recover_daemon_set_image_replacement(self, daemon_set_name: str, original_image: str):
+        daemon_set_yaml = self._get_daemon_set_yaml(daemon_set_name)
+        if "spec" in daemon_set_yaml and "template" in daemon_set_yaml["spec"]:
+            template_spec = daemon_set_yaml["spec"]["template"]["spec"]
+            if "containers" in template_spec:
+                for container in template_spec["containers"]:
+                    if "image" in container and container["image"] != original_image:
+                        container["image"] = original_image
+                        modified_yaml_path = self._write_yaml_to_file(daemon_set_name, daemon_set_yaml)
+                        self.kubectl.exec_command(f"kubectl apply -f {modified_yaml_path}")
+                        self.kubectl.exec_command(f"kubectl rollout restart ds {daemon_set_name} -n {self.namespace}")
+                        self.kubectl.exec_command(f"kubectl rollout status ds {daemon_set_name} -n {self.namespace} --timeout=60s")
+                        return
+
+    def inject_gogc_env_variable_patch(self, gogc_value: str):
+        """Set GOGC environment variable for all deployments via patch method"""
+        # Get all deployment names
+        deployments_cmd = f"kubectl get deployments -n {self.namespace} -o jsonpath='{{.items[*].metadata.name}}'"
+        deployment_names = self.kubectl.exec_command(deployments_cmd).split()
+        
+        for deployment_name in deployment_names:
+            if not deployment_name:
+                continue
+                
+            print(f"Patching GOGC={gogc_value} for deployment: {deployment_name}")
+            
+            # Construct patch operations
+            patch_ops = []
+            
+            # Get container count
+            containers_cmd = f"kubectl get deployment {deployment_name} -n {self.namespace} -o jsonpath='{{.spec.template.spec.containers[*].name}}'"
+            container_names = self.kubectl.exec_command(containers_cmd).split()
+            
+            for i, container_name in enumerate(container_names):
+                # Check if env array exists
+                env_check_cmd = f"kubectl get deployment {deployment_name} -n {self.namespace} -o jsonpath='{{.spec.template.spec.containers[{i}].env}}'"
+                existing_env = self.kubectl.exec_command(env_check_cmd).strip()
+                
+                if not existing_env or existing_env == "[]":
+                    # Create env array
+                    patch_ops.append({
+                        "op": "add",
+                        "path": f"/spec/template/spec/containers/{i}/env",
+                        "value": [{"name": "GOGC", "value": gogc_value}]
+                    })
+                else:
+                    # Check if GOGC already exists
+                    gogc_check_cmd = f"kubectl get deployment {deployment_name} -n {self.namespace} -o jsonpath='{{.spec.template.spec.containers[{i}].env[?(@.name==\"GOGC\")].value}}'"
+                    existing_gogc = self.kubectl.exec_command(gogc_check_cmd).strip()
+                    
+                    if existing_gogc:
+                        # Update existing GOGC value
+                        # Need to find GOGC's index in env array
+                        env_names_cmd = f"kubectl get deployment {deployment_name} -n {self.namespace} -o jsonpath='{{.spec.template.spec.containers[{i}].env[*].name}}'"
+                        env_names = self.kubectl.exec_command(env_names_cmd).split()
+                        
+                        for j, env_name in enumerate(env_names):
+                            if env_name == "GOGC":
+                                patch_ops.append({
+                                    "op": "replace",
+                                    "path": f"/spec/template/spec/containers/{i}/env/{j}/value",
+                                    "value": gogc_value
+                                })
+                                break
+                    else:
+                        # Add new GOGC environment variable
+                        patch_ops.append({
+                            "op": "add",
+                            "path": f"/spec/template/spec/containers/{i}/env/-",
+                            "value": {"name": "GOGC", "value": gogc_value}
+                        })
+            
+            if patch_ops:
+                import json
+                patch_json = json.dumps(patch_ops)
+                patch_cmd = f"kubectl patch deployment {deployment_name} -n {self.namespace} --type='json' -p='{patch_json}'"
+                
+                try:
+                    result = self.kubectl.exec_command(patch_cmd)
+                    print(f"Patch result for {deployment_name}: {result}")
+                    
+                    # Restart deployment to apply changes
+                    self.kubectl.exec_command(f"kubectl rollout restart deployment {deployment_name} -n {self.namespace}")
+                    
+                except Exception as e:
+                    raise RuntimeError(f"Failed to patch {deployment_name}: {e}")
+        
+        # Wait for all deployments to be ready
+        print("Waiting for all deployments to be ready...")
+        for deployment_name in deployment_names:
+            if deployment_name:
+                self.kubectl.exec_command(f"kubectl rollout status deployment {deployment_name} -n {self.namespace} --timeout=120s")
+        
+        print(f"All deployments updated with GOGC={gogc_value}")
+
+    def recover_gogc_env_variable_patch(self):
+        """Recover all deployment GOGC environment variables to default value 100"""
+        # Get all deployment names
+        deployments_cmd = f"kubectl get deployments -n {self.namespace} -o jsonpath='{{.items[*].metadata.name}}'"
+        deployment_names = self.kubectl.exec_command(deployments_cmd).split()
+        
+        for deployment_name in deployment_names:
+            if not deployment_name:
+                continue
+                
+            print(f"Recovering GOGC to default (100) for deployment: {deployment_name}")
+            
+            # Construct patch operations
+            patch_ops = []
+            
+            # Get container count
+            containers_cmd = f"kubectl get deployment {deployment_name} -n {self.namespace} -o jsonpath='{{.spec.template.spec.containers[*].name}}'"
+            container_names = self.kubectl.exec_command(containers_cmd).split()
+            
+            for i, container_name in enumerate(container_names):
+                # Check if env array exists
+                env_check_cmd = f"kubectl get deployment {deployment_name} -n {self.namespace} -o jsonpath='{{.spec.template.spec.containers[{i}].env}}'"
+                existing_env = self.kubectl.exec_command(env_check_cmd).strip()
+                
+                if existing_env and existing_env != "[]":
+                    # Check if GOGC exists
+                    gogc_check_cmd = f"kubectl get deployment {deployment_name} -n {self.namespace} -o jsonpath='{{.spec.template.spec.containers[{i}].env[?(@.name==\"GOGC\")].value}}'"
+                    existing_gogc = self.kubectl.exec_command(gogc_check_cmd).strip()
+                    
+                    if existing_gogc:
+                        # Find GOGC's index in env array and update to 100
+                        env_names_cmd = f"kubectl get deployment {deployment_name} -n {self.namespace} -o jsonpath='{{.spec.template.spec.containers[{i}].env[*].name}}'"
+                        env_names = self.kubectl.exec_command(env_names_cmd).split()
+                        
+                        for j, env_name in enumerate(env_names):
+                            if env_name == "GOGC":
+                                patch_ops.append({
+                                    "op": "replace",
+                                    "path": f"/spec/template/spec/containers/{i}/env/{j}/value",
+                                    "value": "100"
+                                })
+                                print(f"Found GOGC={existing_gogc} in container {container_name}, updating to 100")
+                                break
+                    else:
+                        print(f"No GOGC environment variable found in container {container_name}")
+                else:
+                    print(f"No environment variables found in container {container_name}")
+            
+            if patch_ops:
+                import json
+                patch_json = json.dumps(patch_ops)
+                patch_cmd = f"kubectl patch deployment {deployment_name} -n {self.namespace} --type='json' -p='{patch_json}'"
+                
+                try:
+                    result = self.kubectl.exec_command(patch_cmd)
+                    print(f"Patch result for {deployment_name}: {result}")
+                    
+                    # Restart deployment to apply changes
+                    self.kubectl.exec_command(f"kubectl rollout restart deployment {deployment_name} -n {self.namespace}")
+                    
+                except Exception as e:
+                    raise RuntimeError(f"Failed to patch {deployment_name}: {e}")
+            else:
+                print(f"No GOGC environment variables to recover in deployment: {deployment_name}")
+        
+        # Wait for all deployments to be ready
+        print("Waiting for all deployments to be ready...")
+        for deployment_name in deployment_names:
+            if deployment_name:
+                try:
+                    self.kubectl.exec_command(f"kubectl rollout status deployment {deployment_name} -n {self.namespace} --timeout=120s")
+                except Exception as e:
+                    print(f"Warning: Failed to wait for deployment {deployment_name}: {e}")
+        
+        print("All deployments with GOGC environment variables have been recovered to default value (100)")
 
     ############# HELPER FUNCTIONS ################
     def _wait_for_pods_ready(self, microservices: list[str], timeout: int = 30):
@@ -1735,6 +1925,10 @@ class VirtualizationFaultInjector(FaultInjector):
     def _get_service_yaml(self, service_name: str):
         deployment_yaml = self.kubectl.exec_command(f"kubectl get service {service_name} -n {self.namespace} -o yaml")
         return yaml.safe_load(deployment_yaml)
+    
+    def _get_daemon_set_yaml(self, daemon_set_name: str):
+        daemon_set_yaml = self.kubectl.exec_command(f"kubectl get ds {daemon_set_name} -n {self.namespace} -o yaml")
+        return yaml.safe_load(daemon_set_yaml)
 
     def _change_node_selector(self, deployment_yaml: dict, node_name: str):
         if "spec" in deployment_yaml and "template" in deployment_yaml["spec"]:
@@ -1749,6 +1943,12 @@ class VirtualizationFaultInjector(FaultInjector):
         with open(file_path, "w") as file:
             yaml.dump(yaml_content, file)
         return file_path
+    
+    def scale_pods_to(self, replicas: int, microservices: list[str]):
+        """Inject a fault to scale pods to zero for a service."""
+        for service in microservices:
+            self.kubectl.exec_command(f"kubectl scale deployment {service} --replicas={replicas} -n {self.namespace}")
+            print(f"Scaled deployment {service} to {replicas} replicas | namespace: {self.namespace}")
 
     def _wait_for_dns_policy_propagation(
         self, service: str, external_ns: str, expect_external: bool, sleep: int = 2, max_wait: int = 120
