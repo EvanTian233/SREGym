@@ -149,6 +149,16 @@ class SREArenaDashboardServer:
         # No external logs available, return None to skip this update
         return None
 
+    def _drain_log_queue(self) -> list[dict]:
+        """Drain and return all pending logs from the external queue in FIFO order."""
+        drained: list[dict] = []
+        with self._log_lock:
+            while self.external_log_queue:
+                drained.append(self.external_log_queue.popleft())
+        if drained:
+            self.log_history.extend(drained)
+        return drained
+
     def _parse_concise_deployment_info(self, info_str):
         """Parse the concise deployment info from kubectl get deployment -o wide output"""
         if not info_str or not info_str.strip():
@@ -621,6 +631,7 @@ class SREArenaDashboardServer:
             # If another invocation is updating, skip this tick to avoid piling up
             if self._state_lock.locked():
                 return dash.no_update, None
+            print(f"<<<<<<<<<< Try update rows: {n}, children: {len(current_children) if current_children else 0}")
 
             # Collect realtime cluster data outside of lock (can be slow)
             realtime_state = self._collect_cluster_data(self.namespace)
@@ -628,11 +639,12 @@ class SREArenaDashboardServer:
             # Try to enter critical section without blocking
             if not self._state_lock.acquire(blocking=False):
                 return dash.no_update, None
-            try:
-                # Pop next log under the state lock to preserve strict ordering
-                new_log = self._generate_log_data()
-                # No new log: refresh only the live row if exists
-                if new_log is None:
+            try:  
+                # Drain all pending logs under the state lock to preserve ordering
+                new_logs = self._drain_log_queue()
+                print(f"<<<<<<<<<< Entered critical section, Fetched New logs: {len(new_logs)}, children: {len(current_children) if current_children else 0}")
+                # No new logs: refresh only the live row if exists
+                if not new_logs:
                     if self.latest_log is not None:
                         latest_row = html.Div(
                             [
@@ -661,44 +673,77 @@ class SREArenaDashboardServer:
                         children.append(latest_row)
                         return children, None
                     # No latest log yet, just return history
+                    print(f"<<<<<<<<<< No latest log yet, just return history")
                     return list(self.history_rows), None
 
-                # New log arrived: snapshot cluster state as the checkpoint for this log
+                # New logs arrived: snapshot cluster state as the checkpoint for this batch
                 snapshot_state = realtime_state
 
                 # If there was a previous latest log, push it to history using its checkpoint
                 if self.latest_log is not None and self.latest_ckpt_state is not None:
-                    # Special handling for SPLIT type logs in history
                     if self.latest_log.get("type") == "SPLIT":
-                        history_child = self._render_split_line()
+                        self.history_rows.append(self._render_split_line())
                     else:
-                        history_child = html.Div(
-                            [
-                                html.Div(
-                                    self._render_log_block(self.latest_log),
-                                    style={
-                                        "width": "50%",
-                                        "float": "left",
-                                        "padding": "4px",
-                                        "box-sizing": "border-box",
-                                    },
-                                ),
-                                html.Div(
-                                    self._render_status_block(self.latest_ckpt_state),
-                                    style={
-                                        "width": "50%",
-                                        "float": "left",
-                                        "padding": "4px",
-                                        "box-sizing": "border-box",
-                                    },
-                                ),
-                            ],
-                            style={"width": "100%", "overflow": "hidden", "margin-bottom": "6px"},
+                        self.history_rows.append(
+                            html.Div(
+                                [
+                                    html.Div(
+                                        self._render_log_block(self.latest_log),
+                                        style={
+                                            "width": "50%",
+                                            "float": "left",
+                                            "padding": "4px",
+                                            "box-sizing": "border-box",
+                                        },
+                                    ),
+                                    html.Div(
+                                        self._render_status_block(self.latest_ckpt_state),
+                                        style={
+                                            "width": "50%",
+                                            "float": "left",
+                                            "padding": "4px",
+                                            "box-sizing": "border-box",
+                                        },
+                                    ),
+                                ],
+                                style={"width": "100%", "overflow": "hidden", "margin-bottom": "6px"},
+                            )
                         )
-                    self.history_rows.append(history_child)
 
-                # Update latest pointers
-                self.latest_log = new_log
+                # Push all but the newest drained logs into history using the batch snapshot
+                if len(new_logs) > 1:
+                    for queued_log in new_logs[:-1]:
+                        if queued_log.get("type") == "SPLIT":
+                            self.history_rows.append(self._render_split_line())
+                        else:
+                            self.history_rows.append(
+                                html.Div(
+                                    [
+                                        html.Div(
+                                            self._render_log_block(queued_log),
+                                            style={
+                                                "width": "50%",
+                                                "float": "left",
+                                                "padding": "4px",
+                                                "box-sizing": "border-box",
+                                            },
+                                        ),
+                                        html.Div(
+                                            self._render_status_block(snapshot_state),
+                                            style={
+                                                "width": "50%",
+                                                "float": "left",
+                                                "padding": "4px",
+                                                "box-sizing": "border-box",
+                                            },
+                                        ),
+                                    ],
+                                    style={"width": "100%", "overflow": "hidden", "margin-bottom": "6px"},
+                                )
+                            )
+
+                # Update latest pointers with the newest log in this batch
+                self.latest_log = new_logs[-1]
                 self.latest_ckpt_state = snapshot_state
 
                 # Build the new latest row with real-time state on the right
@@ -718,6 +763,7 @@ class SREArenaDashboardServer:
 
                 children = list(self.history_rows)
                 children.append(latest_row)
+                print(f"<<<<<<<<<< now children list has: {len(children)}")
                 return children, True
             finally:
                 self._state_lock.release()
