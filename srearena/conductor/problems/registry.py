@@ -102,8 +102,8 @@ class ProblemRegistry:
             "chaos_mesh_jvm_return": ChaosMeshJVMReturnFault,
             "chaos_mesh_memory_stress": ChaosMeshMemoryStress,
             "chaos_mesh_http_post_tamper": ChaosMeshHttpPostTamper,
-            # # ---
-            # # --- Astro shop problems with no mitigation oracle
+            # # # ---
+            # # # --- Astro shop problems with no mitigation oracle
             "astronomy_shop_ad_service_failure": AdServiceFailure,
             "astronomy_shop_ad_service_high_cpu": AdServiceHighCpu,
             "astronomy_shop_ad_service_manual_gc": AdServiceManualGc,
@@ -113,7 +113,7 @@ class ProblemRegistry:
             "astronomy_shop_payment_service_unreachable": PaymentServiceUnreachable,
             "astronomy_shop_product_catalog_service_failure": ProductCatalogServiceFailure,
             "astronomy_shop_recommendation_service_cache_failure": RecommendationServiceCacheFailure,
-            # ---
+            # # ---
             "wrong_bin_usage": WrongBinUsage,
             "taint_no_toleration_social_network": lambda: TaintNoToleration(),
             "missing_service_hotel_reservation": lambda: MissingService(
@@ -228,7 +228,7 @@ class ProblemRegistry:
             "namespace_memory_limit": NamespaceMemoryLimit,
             "pvc_claim_mismatch": PVCClaimMismatch,
             "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
-            # # K8S operator misoperation
+            # # # K8S operator misoperation
             "operator_overload_replicas": K8SOperatorOverloadReplicasFault,
             "operator_non_existent_storage": K8SOperatorNonExistentStorageFault,
             "operator_invalid_affinity_toleration": K8SOperatorInvalidAffinityTolerationFault,
