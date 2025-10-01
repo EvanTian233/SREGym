@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 
-class JaegerTiDB:
+class Jaeger:
     def __init__(self):
         self.namespace = "observe"
         base_dir = Path(__file__).parent
@@ -39,7 +39,9 @@ class JaegerTiDB:
         while time.time() - t0 < timeout:
             result = subprocess.run(
                 f"kubectl -n {self.namespace} get svc {service}",
-                shell=True, capture_output=True, text=True,
+                shell=True,
+                capture_output=True,
+                text=True,
             )
             if result.returncode == 0:
                 print(f"[debug] found service {service}")
@@ -98,7 +100,5 @@ class JaegerTiDB:
             print("Port forwarding stopped.")
 
 
-    
 if __name__ == "__main__":
-    jaeger = JaegerTiDB()
-
+    jaeger = Jaeger()

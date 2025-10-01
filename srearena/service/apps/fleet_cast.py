@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from srearena.generators.workload.locust import LocustWorkloadManager
-from srearena.observer.logstash.jaeger.jaeger import JaegerTiDB
+from srearena.observer.logstash.jaeger.jaeger import Jaeger
 from srearena.paths import FLEET_CAST_METADATA
 from srearena.service.apps import tidb_prometheus
 from srearena.service.apps.base import Application
@@ -138,7 +138,7 @@ class FleetCast(Application):
         print("\n FleetCast deployment is complete and ready.")
         tidb_prometheus.main()
         print("PROMETHEUS: deployed TiDB monitoring stack.")
-        JaegerTiDB().deploy()
+        Jaeger().deploy()
 
     def _get_ingress_svc_info(self) -> dict:
         """Return info about ingress-nginx-controller Service (type, external ip/hostname, nodePort for http/https)."""
