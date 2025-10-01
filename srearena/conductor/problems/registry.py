@@ -36,6 +36,13 @@ from srearena.conductor.problems.network_delay import ChaosMeshNetworkDelay
 from srearena.conductor.problems.network_loss import ChaosMeshNetworkLoss
 from srearena.conductor.problems.network_partition import ChaosMeshNetworkPartition
 from srearena.conductor.problems.network_policy_block import NetworkPolicyBlock
+from srearena.conductor.problems.operator_misoperation.invalid_affinity_toleration import (
+    K8SOperatorInvalidAffinityTolerationFault,
+)
+from srearena.conductor.problems.operator_misoperation.non_existent_storage import K8SOperatorNonExistentStorageFault
+from srearena.conductor.problems.operator_misoperation.overload_replicas import K8SOperatorOverloadReplicasFault
+from srearena.conductor.problems.operator_misoperation.security_context_fault import K8SOperatorSecurityContextFault
+from srearena.conductor.problems.operator_misoperation.wrong_update_strategy import K8SOperatorWrongUpdateStrategyFault
 from srearena.conductor.problems.payment_service_failure import PaymentServiceFailure
 from srearena.conductor.problems.payment_service_unreachable import PaymentServiceUnreachable
 from srearena.conductor.problems.persistent_volume_affinity_violation import PersistentVolumeAffinityViolation
@@ -67,79 +74,76 @@ from srearena.conductor.problems.wrong_bin_usage import WrongBinUsage
 from srearena.conductor.problems.wrong_dns_policy import WrongDNSPolicy
 from srearena.conductor.problems.wrong_service_selector import WrongServiceSelector
 from srearena.service.kubectl import KubeCtl
-from srearena.conductor.problems.operator_misoperation.security_context_fault import K8SOperatorSecurityContextFault
-from srearena.conductor.problems.operator_misoperation.wrong_update_strategy import K8SOperatorWrongUpdateStrategyFault
-from srearena.conductor.problems.operator_misoperation.invalid_affinity_toleration import K8SOperatorInvalidAffinityTolerationFault
-from srearena.conductor.problems.operator_misoperation.overload_replicas import K8SOperatorOverloadReplicasFault
-from srearena.conductor.problems.operator_misoperation.non_existent_storage import K8SOperatorNonExistentStorageFault
+
+
 class ProblemRegistry:
     def __init__(self):
         self.PROBLEM_REGISTRY = {
-             "k8s_target_port-misconfig": lambda: K8STargetPortMisconfig(faulty_service="user-service"),
-             "auth_miss_mongodb": MongoDBAuthMissing,
-             "revoke_auth_mongodb-1": lambda: MongoDBRevokeAuth(faulty_service="mongodb-geo"),
-             "revoke_auth_mongodb-2": lambda: MongoDBRevokeAuth(faulty_service="mongodb-rate"),
-             "storage_user_unregistered-1": lambda: MongoDBUserUnregistered(faulty_service="mongodb-geo"),
-             "storage_user_unregistered-2": lambda: MongoDBUserUnregistered(faulty_service="mongodb-rate"),
-             "misconfig_app_hotel_res": MisconfigAppHotelRes,
-             "scale_pod_zero_social_net": ScalePodSocialNet,
-             "assign_to_non_existent_node": AssignNonExistentNode,
-             "pod_anti_affinity_deadlock": PodAntiAffinityDeadlock,
+            "k8s_target_port-misconfig": lambda: K8STargetPortMisconfig(faulty_service="user-service"),
+            "auth_miss_mongodb": MongoDBAuthMissing,
+            "revoke_auth_mongodb-1": lambda: MongoDBRevokeAuth(faulty_service="mongodb-geo"),
+            "revoke_auth_mongodb-2": lambda: MongoDBRevokeAuth(faulty_service="mongodb-rate"),
+            "storage_user_unregistered-1": lambda: MongoDBUserUnregistered(faulty_service="mongodb-geo"),
+            "storage_user_unregistered-2": lambda: MongoDBUserUnregistered(faulty_service="mongodb-rate"),
+            "misconfig_app_hotel_res": MisconfigAppHotelRes,
+            "scale_pod_zero_social_net": ScalePodSocialNet,
+            "assign_to_non_existent_node": AssignNonExistentNode,
+            "pod_anti_affinity_deadlock": PodAntiAffinityDeadlock,
             # --- Chaos Mesh problems (No mitigation oracle)
-             "chaos_mesh_container_kill": ChaosMeshContainerKill,
-             "chaos_mesh_pod_failure": ChaosMeshPodFailure,
-             "chaos_mesh_pod_kill": ChaosMeshPodKill,
-             "chaos_mesh_network_loss": ChaosMeshNetworkLoss,
-             "chaos_mesh_network_delay": ChaosMeshNetworkDelay,
-             "chaos_mesh_network_partition": ChaosMeshNetworkPartition,
-             "chaos_mesh_http_abort": ChaosMeshHttpAbort,
-             "chaos_mesh_cpu_stress": ChaosMeshCPUStress,
-             "chaos_mesh_jvm_stress": ChaosMeshJVMHeapStress,
-             "chaos_mesh_jvm_return": ChaosMeshJVMReturnFault,
-             "chaos_mesh_memory_stress": ChaosMeshMemoryStress,
-             "chaos_mesh_http_post_tamper": ChaosMeshHttpPostTamper,
+            "chaos_mesh_container_kill": ChaosMeshContainerKill,
+            "chaos_mesh_pod_failure": ChaosMeshPodFailure,
+            "chaos_mesh_pod_kill": ChaosMeshPodKill,
+            "chaos_mesh_network_loss": ChaosMeshNetworkLoss,
+            "chaos_mesh_network_delay": ChaosMeshNetworkDelay,
+            "chaos_mesh_network_partition": ChaosMeshNetworkPartition,
+            "chaos_mesh_http_abort": ChaosMeshHttpAbort,
+            "chaos_mesh_cpu_stress": ChaosMeshCPUStress,
+            "chaos_mesh_jvm_stress": ChaosMeshJVMHeapStress,
+            "chaos_mesh_jvm_return": ChaosMeshJVMReturnFault,
+            "chaos_mesh_memory_stress": ChaosMeshMemoryStress,
+            "chaos_mesh_http_post_tamper": ChaosMeshHttpPostTamper,
             # # ---
             # # --- Astro shop problems with no mitigation oracle
-             "astronomy_shop_ad_service_failure": AdServiceFailure,
-             "astronomy_shop_ad_service_high_cpu": AdServiceHighCpu,
-             "astronomy_shop_ad_service_manual_gc": AdServiceManualGc,
-             "astronomy_shop_cart_service_failure": CartServiceFailure,
-             "astronomy_shop_ad_service_image_slow_load": ImageSlowLoad,
-             "astronomy_shop_payment_service_failure": PaymentServiceFailure,
-             "astronomy_shop_payment_service_unreachable": PaymentServiceUnreachable,
-             "astronomy_shop_product_catalog_service_failure": ProductCatalogServiceFailure,
-             "astronomy_shop_recommendation_service_cache_failure": RecommendationServiceCacheFailure,
+            "astronomy_shop_ad_service_failure": AdServiceFailure,
+            "astronomy_shop_ad_service_high_cpu": AdServiceHighCpu,
+            "astronomy_shop_ad_service_manual_gc": AdServiceManualGc,
+            "astronomy_shop_cart_service_failure": CartServiceFailure,
+            "astronomy_shop_ad_service_image_slow_load": ImageSlowLoad,
+            "astronomy_shop_payment_service_failure": PaymentServiceFailure,
+            "astronomy_shop_payment_service_unreachable": PaymentServiceUnreachable,
+            "astronomy_shop_product_catalog_service_failure": ProductCatalogServiceFailure,
+            "astronomy_shop_recommendation_service_cache_failure": RecommendationServiceCacheFailure,
             # ---
-             "wrong_bin_usage": WrongBinUsage,
-             "taint_no_toleration_social_network": lambda: TaintNoToleration(),
-             "missing_service_hotel_reservation": lambda: MissingService(
-                 app_name="hotel_reservation", faulty_service="mongodb-rate"
-             ),
-             "missing_service_social_network": lambda: MissingService(
-                 app_name="social_network", faulty_service="user-service"
+            "wrong_bin_usage": WrongBinUsage,
+            "taint_no_toleration_social_network": lambda: TaintNoToleration(),
+            "missing_service_hotel_reservation": lambda: MissingService(
+                app_name="hotel_reservation", faulty_service="mongodb-rate"
             ),
-             "resource_request_too_large": lambda: ResourceRequestTooLarge(
+            "missing_service_social_network": lambda: MissingService(
+                app_name="social_network", faulty_service="user-service"
+            ),
+            "resource_request_too_large": lambda: ResourceRequestTooLarge(
                 app_name="hotel_reservation", faulty_service="mongodb-rate"
             ),
             "resource_request_too_small": lambda: ResourceRequestTooSmall(
                 app_name="hotel_reservation", faulty_service="mongodb-rate"
             ),
-             "wrong_service_selector_astronomy_shop": lambda: WrongServiceSelector(
-                 app_name="astronomy_shop", faulty_service="frontend"
-             ),
-             "wrong_service_selector_hotel_reservation": lambda: WrongServiceSelector(
+            "wrong_service_selector_astronomy_shop": lambda: WrongServiceSelector(
+                app_name="astronomy_shop", faulty_service="frontend"
+            ),
+            "wrong_service_selector_hotel_reservation": lambda: WrongServiceSelector(
                 app_name="hotel_reservation", faulty_service="frontend"
-             ),
+            ),
             "wrong_service_selector_social_network": lambda: WrongServiceSelector(
                 app_name="social_network", faulty_service="user-service"
             ),
             "service_dns_resolution_failure_astronomy_shop": lambda: ServiceDNSResolutionFailure(
                 app_name="astronomy_shop", faulty_service="frontend"
             ),
-             "service_dns_resolution_failure_social_network": lambda: ServiceDNSResolutionFailure(
+            "service_dns_resolution_failure_social_network": lambda: ServiceDNSResolutionFailure(
                 app_name="social_network", faulty_service="user-service"
             ),
-             "wrong_dns_policy_astronomy_shop": lambda: WrongDNSPolicy(
+            "wrong_dns_policy_astronomy_shop": lambda: WrongDNSPolicy(
                 app_name="astronomy_shop", faulty_service="frontend"
             ),
             "wrong_dns_policy_social_network": lambda: WrongDNSPolicy(
@@ -224,13 +228,12 @@ class ProblemRegistry:
             "namespace_memory_limit": NamespaceMemoryLimit,
             "pvc_claim_mismatch": PVCClaimMismatch,
             "missing_service_astronomy_shop": lambda: MissingService(app_name="astronomy_shop", faulty_service="ad"),
-            # # K8S operator misoperation 
-           "operator_overload_replicas": K8SOperatorOverloadReplicasFault,
-           "operator_non_existent_storage": K8SOperatorNonExistentStorageFault,
-           "operator_invalid_affinity_toleration": K8SOperatorInvalidAffinityTolerationFault,
-           "operator_security_context_fault": K8SOperatorSecurityContextFault,
-         "operator_wrong_update_strategy_fault": K8SOperatorWrongUpdateStrategyFault,
-          
+            # # K8S operator misoperation
+            "operator_overload_replicas": K8SOperatorOverloadReplicasFault,
+            "operator_non_existent_storage": K8SOperatorNonExistentStorageFault,
+            "operator_invalid_affinity_toleration": K8SOperatorInvalidAffinityTolerationFault,
+            "operator_security_context_fault": K8SOperatorSecurityContextFault,
+            "operator_wrong_update_strategy_fault": K8SOperatorWrongUpdateStrategyFault,
             "rpc_retry_storm": RPCRetryStorm,
             "social_net_hotel_res_astro_shop_concurrent_failures": lambda: MultipleIndependentFailures(
                 problems=[
