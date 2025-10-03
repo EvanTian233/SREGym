@@ -1,12 +1,13 @@
 import json
-import time
+import os
 import subprocess
-
+import time
 from pathlib import Path
 from textwrap import dedent
-from srearena.service.apps import tidb_prometheus
+
+from srearena.observer import tidb_prometheus
 from srearena.paths import BASE_DIR
-import os
+
 
 class TiDBClusterDeployer:
     def __init__(self, metadata_path):
@@ -23,7 +24,6 @@ class TiDBClusterDeployer:
         self.operator_version = self.metadata["Helm Operator Config"]["version"]
         self.operator_crd_url = self.metadata["Helm Operator Config"]["CRD"]
 
-       
         env_path = os.environ.get("TIDB_OPERATOR_VALUES")
         self.operator_values_path = ""
         if env_path and Path(env_path).expanduser().exists():
@@ -56,10 +56,12 @@ class TiDBClusterDeployer:
 
     def install_local_path_provisioner(self):
         print("Installing local-path provisioner for dynamic volume provisioning...")
-        self.run_cmd("kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml")
-        self.run_cmd("kubectl patch storageclass local-path -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"true\"}}}'")
-    
-
+        self.run_cmd(
+            "kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml"
+        )
+        self.run_cmd(
+            'kubectl patch storageclass local-path -p \'{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}\''
+        )
 
     def apply_prometheus(self):
         ns = "observe"
@@ -106,10 +108,14 @@ class TiDBClusterDeployer:
         label = "app.kubernetes.io/component=controller-manager"
         for _ in range(24):
             try:
-                status = subprocess.check_output(
-                    f"kubectl get pods -n {self.operator_namespace} -l {label} -o jsonpath='{{.items[0].status.phase}}'",
-                    shell=True,
-                ).decode().strip()
+                status = (
+                    subprocess.check_output(
+                        f"kubectl get pods -n {self.operator_namespace} -l {label} -o jsonpath='{{.items[0].status.phase}}'",
+                        shell=True,
+                    )
+                    .decode()
+                    .strip()
+                )
                 if status == "Running":
                     print(" tidb-controller-manager pod is running.")
                     return
@@ -125,7 +131,6 @@ class TiDBClusterDeployer:
         print(f"Deploying TiDB cluster manifest from {self.cluster_config_url}...")
         self.run_cmd(f"kubectl apply -f {self.cluster_config_url} -n {self.namespace_tidb_cluster}")
 
-
     def run_sql(self, sql_text: str):
         ns = self.namespace_tidb_cluster
         svc = f"{self.tidb_service}.{ns}.svc"
@@ -133,7 +138,9 @@ class TiDBClusterDeployer:
         user = self.tidb_user
 
         self.run_cmd(f"kubectl -n {ns} delete pod/mysql-client --ignore-not-found")
-        self.run_cmd(f"kubectl -n {ns} run mysql-client --image=mysql:8 --restart=Never --command -- sleep 3600 || true")
+        self.run_cmd(
+            f"kubectl -n {ns} run mysql-client --image=mysql:8 --restart=Never --command -- sleep 3600 || true"
+        )
         self.run_cmd(f"kubectl -n {ns} wait --for=condition=Ready pod/mysql-client --timeout=180s")
 
         sql = dedent(sql_text).strip()
@@ -185,6 +192,7 @@ SQL"
         );
         """
         self.run_sql(sql)
+
     def wait_for_pods_ready(self, selector: str, poll: float = 1.0):
         """
         Poll every `poll` seconds until ALL pods matching `selector` are Ready.
@@ -196,8 +204,8 @@ SQL"
                 out = subprocess.check_output(
                     f"kubectl -n {ns} get pods -l '{selector}' "
                     "-o jsonpath='{range .items[*]}{.metadata.name} "
-                    "{range .status.containerStatuses[*]}{.ready} {end}{\"\\n\"}{end}'",
-                    shell=True
+                    '{range .status.containerStatuses[*]}{.ready} {end}{"\\n"}{end}\'',
+                    shell=True,
                 ).decode()
 
                 lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
@@ -221,44 +229,48 @@ SQL"
         then wait for the TiDB Service to exist and have endpoints.
         """
         ns = self.namespace_tidb_cluster
-        cluster = "basic"  
+        cluster = "basic"
 
         # 1) PD
-        self.wait_for_pods_ready(
-            selector="app.kubernetes.io/instance=basic,app.kubernetes.io/component=pd"
-        )
+        self.wait_for_pods_ready(selector="app.kubernetes.io/instance=basic,app.kubernetes.io/component=pd")
 
         # 2) TiKV
-        self.wait_for_pods_ready(
-            selector="app.kubernetes.io/instance=basic,app.kubernetes.io/component=tikv"
-        )
+        self.wait_for_pods_ready(selector="app.kubernetes.io/instance=basic,app.kubernetes.io/component=tikv")
 
         # 3) TiDB
-        self.wait_for_pods_ready(
-            selector="app.kubernetes.io/instance=basic,app.kubernetes.io/component=tidb"
-        )
+        self.wait_for_pods_ready(selector="app.kubernetes.io/instance=basic,app.kubernetes.io/component=tidb")
 
         try:
-            svc_name = subprocess.check_output(
-                f"kubectl -n {ns} get svc -l app.kubernetes.io/instance={cluster},"
-                "app.kubernetes.io/component=tidb "
-                "-o jsonpath='{.items[0].metadata.name}'",
-                shell=True
-            ).decode().strip().strip("'")
+            svc_name = (
+                subprocess.check_output(
+                    f"kubectl -n {ns} get svc -l app.kubernetes.io/instance={cluster},"
+                    "app.kubernetes.io/component=tidb "
+                    "-o jsonpath='{.items[0].metadata.name}'",
+                    shell=True,
+                )
+                .decode()
+                .strip()
+                .strip("'")
+            )
             if not svc_name:
                 svc_name = self.tidb_service
         except subprocess.CalledProcessError:
             svc_name = self.tidb_service
 
         print(f"[info] Using TiDB Service: {svc_name}")
-        self.tidb_service = svc_name  
+        self.tidb_service = svc_name
         while True:
             try:
-                eps = subprocess.check_output(
-                    f"kubectl -n {ns} get endpoints {svc_name} "
-                    "-o jsonpath='{range .subsets[*].addresses[*]}{.ip}{\"\\n\"}{end}'",
-                    shell=True
-                ).decode().strip().strip("'")
+                eps = (
+                    subprocess.check_output(
+                        f"kubectl -n {ns} get endpoints {svc_name} "
+                        "-o jsonpath='{range .subsets[*].addresses[*]}{.ip}{\"\\n\"}{end}'",
+                        shell=True,
+                    )
+                    .decode()
+                    .strip()
+                    .strip("'")
+                )
                 if eps:
                     print(f"[ok] Service {svc_name} has endpoints:\n{eps}")
                     return
@@ -266,19 +278,18 @@ SQL"
                 pass
             time.sleep(1.0)
 
-
-
     def deploy_all(self):
         print(f"----------Starting deployment: {self.name}")
         self.create_namespace(self.namespace_tidb_cluster)
         self.install_local_path_provisioner()
-        self.install_crds()  
+        self.install_crds()
         self.install_operator_with_values()
         self.wait_for_operator_ready()
         self.deploy_tidb_cluster()
         self.wait_for_basic_workloads()
         self.init_schema_and_seed()
         print("-------------TiDB cluster deployment complete.")
+
 
 if __name__ == "__main__":
     deployer = TiDBClusterDeployer("../metadata/tidb_metadata.json")
