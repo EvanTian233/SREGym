@@ -815,7 +815,7 @@ class SREArenaDashboardServer:
                     },
                 ),
                 # Timer component
-                dcc.Interval(id="interval-component", interval=5000, n_intervals=0),  # Update every 3 seconds
+                dcc.Interval(id="interval-component", interval=3000, n_intervals=0),  # Update every 3 seconds
             ],
             style={
                 "font-family": "Arial, sans-serif",

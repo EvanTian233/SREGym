@@ -3,7 +3,8 @@
 import logging
 import os
 import time
-from typing import Dict, Optional
+import json
+from typing import Any, Dict, Optional
 
 import litellm
 from dotenv import load_dotenv
@@ -12,6 +13,7 @@ from langchain_ibm import ChatWatsonx
 from langchain_litellm import ChatLiteLLM
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from litellm.utils import trim_messages
 from requests.exceptions import HTTPError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -77,7 +79,10 @@ class LiteLLMBackend:
             ]
         elif isinstance(messages, list):
             prompt_messages = messages
-            if isinstance(messages[0], HumanMessage):
+            if len(messages) == 0:
+                arena_logger = logging.getLogger("srearena-global")
+                arena_logger.info("[ERROR] Canary died!")
+            elif isinstance(messages[0], HumanMessage):
                 # logger.info("No system message provided.")
                 system_message = SystemMessage(content="You are a helpful assistant.")
                 if system_prompt is None:
@@ -136,10 +141,17 @@ class LiteLLMBackend:
 
         # Retry logic for rate-limiting
         retry_delay = LLM_QUERY_INIT_RETRY_DELAY
+        trim_message = False
+        
         for attempt in range(LLM_QUERY_MAX_RETRIES):
             try:
+                # trim the first ten message who are AI messages and user messages
+                if trim_message:
+                    arena_logger = logging.getLogger("srearena-global")
+                    new_prompt_messages = trim_messages(prompt_messages)
+                    arena_logger.info(f"[WARNING] Trimming the AI messages and user messages from {len(prompt_messages)} to {len(new_prompt_messages)}")
                 completion = llm.invoke(input=prompt_messages)
-                logger.info(f">>>>>>>>>>>>>>>>>>>>>>>>>llm response: {completion}")
+                # logger.info(f">>> llm response: {completion}")
                 return completion
             except HTTPError as e:
                 # if e.response.status_code == 429 or e.response.status_code == 502 or e.response.status_code == 400:  # Rate-limiting error
@@ -151,8 +163,145 @@ class LiteLLMBackend:
                 # else:
                 #     logger.error(f"HTTP error occurred: {e}")
                 #     raise
+                
+            except litellm.RateLimitError as e:
+                provider_delay = _extract_retry_delay_seconds_from_exception(e)
+                if provider_delay is not None and provider_delay > 0:
+                    arena_logger = logging.getLogger("srearena-global")
+                    arena_logger.info(
+                        f"[WARNING] Rate-limited by provider. Retrying in {provider_delay} seconds... (Attempt {attempt + 1}/{LLM_QUERY_MAX_RETRIES})"
+                    )
+                    time.sleep(provider_delay)
+                else: # actually this fallback should not happen
+                    arena_logger = logging.getLogger("srearena-global")
+                    arena_logger.info(
+                        f"Rate-limited. Retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{LLM_QUERY_MAX_RETRIES})"
+                    )
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+            except IndexError as e:
+                arena_logger = logging.getLogger("srearena-global")
+                arena_logger.info(
+                    f"[ERROR] IndexError occurred on Gemini Server Side: {e}, keep calm for a while..."
+                )
+                trim_message = True
+                time.sleep(30)
+                if attempt == range(LLM_QUERY_MAX_RETRIES) - 1:
+                    arena_logger = logging.getLogger("srearena-global")
+                    arena_logger.info(f"[WARNING] Max retries exceeded due to index error. Unable to complete the request.")
+                    # return an error
+                    return {"messages": []}
             except Exception as e:
                 logger.error(f"An unexpected error occurred: {e}")
                 raise
 
         raise RuntimeError("Max retries exceeded. Unable to complete the request.")
+
+
+def _parse_duration_to_seconds(duration: Any) -> Optional[float]:
+    """Convert duration to seconds.
+
+    Supports:
+    - string like "56s" or "56.374s"
+    - dict with {"seconds": int, "nanos": int}
+    - numeric seconds
+    """
+    if duration is None:
+        return None
+    if isinstance(duration, (int, float)):
+        return float(duration)
+    if isinstance(duration, str):
+        val = duration.strip().lower()
+        if val.endswith("s"):
+            try:
+                return float(val[:-1])
+            except ValueError:
+                return None
+        return None
+    if isinstance(duration, dict):
+        seconds = duration.get("seconds")
+        nanos = duration.get("nanos", 0)
+        if isinstance(seconds, (int, float)):
+            return float(seconds) + (float(nanos) / 1_000_000_000.0)
+    return None
+
+
+def _extract_retry_delay_seconds_from_exception(exc: BaseException) -> Optional[float]:
+    """Extract retry delay seconds from JSON details RetryInfo only.
+    
+    Returns 60.0 if no RetryInfo found in error details.
+    """
+    candidates: list[Any] = []
+
+    # response.json() or response.text
+    response = getattr(exc, "response", None)
+    if response is not None:
+        try:
+            if hasattr(response, "json"):
+                candidates.append(response.json())
+        except Exception:
+            pass
+        try:
+            text = getattr(response, "text", None)
+            if isinstance(text, (str, bytes)):
+                candidates.append(json.loads(text))
+        except Exception:
+            pass
+
+    # message/body/content attributes
+    for attr in ("body", "message", "content"):
+        try:
+            val = getattr(exc, attr, None)
+            if isinstance(val, (dict, list)):
+                candidates.append(val)
+            elif isinstance(val, (str, bytes)):
+                candidates.append(json.loads(val))
+        except Exception:
+            pass
+
+    # args may contain dict/JSON strings
+    try:
+        for arg in getattr(exc, "args", []) or []:
+            if isinstance(arg, (dict, list)):
+                candidates.append(arg)
+            elif isinstance(arg, (str, bytes)):
+                try:
+                    candidates.append(json.loads(arg))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    def find_retry_delay(data: Any) -> Optional[float]:
+        if data is None:
+            return None
+        if isinstance(data, dict):
+            # Error envelope {"error": {...}}
+            if "error" in data:
+                found = find_retry_delay(data.get("error"))
+                if found is not None:
+                    return found
+            # Google RPC details list
+            details = data.get("details")
+            if isinstance(details, list):
+                for item in details:
+                    if isinstance(item, dict):
+                        type_url = item.get("@type") or item.get("type")
+                        if type_url and "google.rpc.RetryInfo" in type_url:
+                            parsed = _parse_duration_to_seconds(item.get("retryDelay"))
+                            if parsed is not None:
+                                return parsed
+        elif isinstance(data, list):
+            for v in data:
+                found = find_retry_delay(v)
+                if found is not None:
+                    return found
+        return None
+
+    for cand in candidates:
+        delay = find_retry_delay(cand)
+        if delay is not None:
+            return delay
+
+    # Default to 60 seconds if no RetryInfo found
+    return 60.0
