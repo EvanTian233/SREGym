@@ -11,7 +11,7 @@ class TiDBClusterDeployHelper:
     def running_cluster(self):
         if not self._ready:
             base_dir = Path(__file__).parent.parent
-            meta_path = base_dir / "metadata" / "tidb_metadata.json"
+            meta_path = base_dir / "service" / "metadata" / "tidb_metadata.json"
             print("Starting TiDB Cluster...")
             deployer = TiDBClusterDeployer(str(meta_path))
             deployer.deploy_all()
