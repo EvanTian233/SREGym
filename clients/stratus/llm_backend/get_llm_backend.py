@@ -16,6 +16,8 @@ from langchain_openai import ChatOpenAI
 from litellm.utils import trim_messages
 from requests.exceptions import HTTPError
 
+from clients.stratus.llm_backend.trim_util import trim_messages_conservative
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -156,10 +158,9 @@ class LiteLLMBackend:
                 # trim the first ten message who are AI messages and user messages
                 if trim_message:
                     arena_logger = logging.getLogger("srearena-global")
-                    new_prompt_messages = trim_messages(prompt_messages)
-                    arena_logger.info(
-                        f"[WARNING] Trimming the AI messages and user messages from {len(prompt_messages)} to {len(new_prompt_messages)}"
-                    )
+                    new_prompt_messages, trim_sum = trim_messages_conservative(prompt_messages)
+                    arena_logger.info(f"[WARNING] Trimming the {trim_sum}/{len(prompt_messages)} messages")
+                    prompt_messages = new_prompt_messages
                 completion = llm.invoke(input=prompt_messages)
                 # logger.info(f">>> llm response: {completion}")
                 return completion
@@ -167,6 +168,11 @@ class LiteLLMBackend:
                 # if e.response.status_code == 429 or e.response.status_code == 502 or e.response.status_code == 400:  # Rate-limiting error
                 logger.warning(
                     f"Rate-limited. Retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{LLM_QUERY_MAX_RETRIES})"
+                )
+                
+                arena_logger = logging.getLogger("srearena-global")
+                arena_logger.info(
+                    f"[WARNING] HTTP error occurred: {e}. Retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{LLM_QUERY_MAX_RETRIES})"
                 )
                 time.sleep(retry_delay)
                 retry_delay *= 2  # Exponential backoff
@@ -189,18 +195,29 @@ class LiteLLMBackend:
                     )
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
+                
+                trim_message = True # reduce overhead
+            except litellm.ServiceUnavailableError as e: # 503
+                arena_logger = logging.getLogger("srearena-global")
+                arena_logger.info(
+                    f"[WARNING] Service unavailable (mostly 503). Retrying in 60 seconds... (Attempt {attempt + 1}/{LLM_QUERY_MAX_RETRIES})"
+                )
+                time.sleep(60)
+                trim_message = True # reduce overhead
             except IndexError as e:
                 arena_logger = logging.getLogger("srearena-global")
-                arena_logger.info(f"[ERROR] IndexError occurred on Gemini Server Side: {e}, keep calm for a while...")
+                arena_logger.info(
+                    f"[ERROR] IndexError occurred on Gemini Server Side: {e}, keep calm for a while... {attempt + 1}/{LLM_QUERY_MAX_RETRIES}"
+                )
                 trim_message = True
                 time.sleep(30)
-                if attempt == range(LLM_QUERY_MAX_RETRIES) - 1:
+                if attempt == LLM_QUERY_MAX_RETRIES - 1:
                     arena_logger = logging.getLogger("srearena-global")
                     arena_logger.info(
                         f"[WARNING] Max retries exceeded due to index error. Unable to complete the request."
                     )
                     # return an error
-                    return {"messages": []}
+                    return AIMessage(content="Server side error")
             except Exception as e:
                 logger.error(f"An unexpected error occurred: {e}")
                 raise
@@ -242,6 +259,8 @@ def _extract_retry_delay_seconds_from_exception(exc: BaseException) -> Optional[
     Returns 60.0 if no RetryInfo found in error details.
     """
     candidates: list[Any] = []
+    
+    print(f"exc: {exc}")
 
     # response.json() or response.text
     response = getattr(exc, "response", None)

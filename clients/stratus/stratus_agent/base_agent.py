@@ -52,6 +52,10 @@ class BaseAgent:
         # planning step, not providing tool
         ai_message = self.llm_inference_step(state["messages"], tools=None)
         self.arena_logger.info(f"[LLM] \n {ai_message.content}")
+        if ai_message.content == "Server side error":
+            return {
+                "messages": [],
+            }
         return {
             "messages": [ai_message],
         }
@@ -74,6 +78,10 @@ class BaseAgent:
                 ai_message = (self.llm_inference_step(state["messages"], tools=self.sync_tools),)
             else:
                 ai_message = self.llm_inference_step(state["messages"], tools=[*self.sync_tools, *self.async_tools])
+        if ai_message.content == "Server side error":
+            return {
+                "messages": [],
+            }
         return {
             "messages": [ai_message],
         }
