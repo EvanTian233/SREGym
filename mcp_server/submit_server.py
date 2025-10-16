@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import requests
@@ -5,6 +6,7 @@ from fastmcp import FastMCP
 
 from clients.stratus.configs.langgraph_tool_configs import LanggraphToolConfig
 from clients.stratus.stratus_utils.get_logger import get_logger
+from clients.stratus.tools.localization import get_resource_uid
 
 logger = get_logger()
 logger.info("Starting Submission MCP Server")
@@ -39,3 +41,17 @@ def submit(ans: str) -> dict[str, str]:
     except Exception as e:
         logger.error(f"[submit_mcp] HTTP submission failed: {e}")
         return {"status": "N/A", "text": f"[submit_mcp] HTTP submission failed: {e}"}
+
+
+@mcp.tool(name="localization")
+async def localization(
+    resource_type: str,
+    resource_name: str,
+) -> dict[str, str]:
+    try:
+        uid = await get_resource_uid(resource_type, resource_name)
+        logger.info(f"[localization_mcp]: Retrieved UID: {uid}")
+        return {"uid": str(uid)}
+    except Exception as e:
+        logger.error(f"[localization_mcp] HTTP call failed: {e}")
+        return {"error": f"[localization_mcp] call failed: {e}"}
