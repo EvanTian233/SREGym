@@ -3,10 +3,11 @@
 <h1>A Unified Framework for Benchmarking SRE Agents</h1>
 
 <!-- [🤖Overview](#🤖overview) |  -->
-[🚀Quick Start](#🚀quickstart) | 
-[📦Installation](#📦installation) | 
-[⚙️Usage](#⚙️usage) | 
+[🚀Quick Start](#🚀quickstart) |
+[📦Installation](#📦installation) |
+[⚙️Usage](#⚙️usage) |
 [📂Project Structure](#📂project-structure) |
+[![Slack](https://img.shields.io/badge/-Slack-4A154B?style=flat-square&logo=slack&logoColor=white)](https://join.slack.com/t/srearena/shared_invite/zt-3gvqxpkpc-RvCUcyBEMvzvXaQS9KtS_w)
 <!-- [📄How to Cite](#📄how-to-cite) -->
 
 <!-- [![ArXiv Link](https://img.shields.io/badge/arXiv-2501.06706-red?logo=arxiv)](https://arxiv.org/pdf/2501.06706)
