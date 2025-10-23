@@ -89,11 +89,16 @@ class LiteLLMBackend:
             raise ValueError(f"messages must be either a string or a list of dicts, but got {type(messages)}")
 
         if self.provider == "openai":
-            llm = ChatOpenAI(
-                model=self.model_name,
-                temperature=self.temperature,
-                top_p=self.top_p,
-            )
+            # Some models (o1, o3, gpt-5) don't support top_p and temperature
+            model_config = {
+                "model": self.model_name,
+            }
+            # Only add temperature and top_p for models that support them
+            # Reasoning models (o1, o3) and newer models (gpt-5) don't support these params
+            if not any(prefix in self.model_name.lower() for prefix in ["o1", "o3", "gpt-5"]):
+                model_config["temperature"] = self.temperature
+                model_config["top_p"] = self.top_p
+            llm = ChatOpenAI(**model_config)
         elif self.provider == "watsonx":
             llm = ChatWatsonx(
                 model_id=self.model_name,
