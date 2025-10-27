@@ -75,7 +75,7 @@ class BaseAgent:
                 raise ValueError("the agent must have at least 1 tool!")
         else:
             if self.async_tools is None:
-                ai_message = (self.llm_inference_step(state["messages"], tools=self.sync_tools),)
+                ai_message = self.llm_inference_step(state["messages"], tools=self.sync_tools)
             else:
                 ai_message = self.llm_inference_step(state["messages"], tools=[*self.sync_tools, *self.async_tools])
         if ai_message.content == "Server side error":
@@ -113,7 +113,7 @@ class BaseAgent:
         return {"messages": result}
 
     def save_agent_graph_to_png(self):
-        try: # in case the service times out
+        try:  # in case the service times out
             with open("./agent_graph.png", "wb") as png:
                 png.write(self.graph.get_graph().draw_mermaid_png())
         except Exception as e:
