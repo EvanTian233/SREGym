@@ -25,6 +25,7 @@ See a complete problem list with descriptions [here](https://docs.google.com/spr
 - [brew](https://docs.brew.sh/Homebrew-and-Python)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [uv](https://github.com/astral-sh/uv)
+- [kind](https://kind.sigs.k8s.io/) (if running locally)
 
 ### Recommendations
 - [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) to test MCP tools.
@@ -81,6 +82,13 @@ Finally:
 python main.py
 ```
 
+### Dashboard
+SREGym provides a dashboard to monitor the status of your evaluation.
+
+The dashboard runs automatically when you start the benchmark with `python main.py`.
+
+You can access the dashboard at `http://localhost:11451` in your web browser.
+
 #### Run your agent on SREGym
 SREGym makes it extremely easy to develop and evaluate your agents, thanks to its decoupled design. 
 There are at most 4 phases in each problem of SREGym:
@@ -122,14 +130,6 @@ SREGym also provides a suite of MCP Servers that support basic cluster managemen
 
 The Stratus agent in [`clients/stratus`](https://github.com/xlab-uiuc/SREGym/tree/main/clients/stratus)
 demonstrates basic usages of these MCP servers in an agent.
-
-### Dashboard
-
-You can run the dashboard manually, using the command.
-```
-python dashboard/dashboard_app.py
-```
-The dashboard will be hosted at localhost:11451 by default.
 
 ## Acknowledgements
 Thank you to [Laude Institute](https://www.laude.org/) for supporting this project.
