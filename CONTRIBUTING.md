@@ -193,13 +193,13 @@ To add a new application to SREGym:
    }
    ```
 
-2. **Create application class** in `SREGym/service/apps/<app-name>.py`:
+2. **Create application class** in `sregym/service/apps/<app-name>.py`:
    ```python
-   from SREGym.service.apps.base import Application
+   from sregym.service.apps.base import Application
 
    class MyApp(Application):
        def __init__(self):
-           super().__init__("SREGym/service/metadata/<app-name>.json")
+           super().__init__("sregym/service/metadata/<app-name>.json")
    ```
 
 3. **Update documentation** if needed
@@ -208,14 +208,14 @@ To add a new application to SREGym:
 
 To add a new problem:
 
-1. **Create problem file** in `SREGym/conductor/problems/<problem-name>.py`:
+1. **Create problem file** in `sregym/conductor/problems/<problem-name>.py`:
    ```python
-   from SREGym.service.apps.myapp import MyApp
-   from SREGym.conductor.oracles.detection import DetectionOracle
-   from SREGym.conductor.oracles.localization import LocalizationOracle
-   from SREGym.conductor.oracles.mitigation import MitigationOracle
-   from SREGym.conductor.problems.base import Problem
-   from SREGym.utils.decorators import mark_fault_injected
+   from sregym.service.apps.myapp import MyApp
+   from sregym.conductor.oracles.detection import DetectionOracle
+   from sregym.conductor.oracles.localization import LocalizationOracle
+   from sregym.conductor.oracles.mitigation import MitigationOracle
+   from sregym.conductor.problems.base import Problem
+   from sregym.utils.decorators import mark_fault_injected
 
    class MyProblem(Problem):
        def __init__(self):
@@ -240,9 +240,9 @@ To add a new problem:
            pass
    ```
 
-2. **Register your problem** in `SREGym/conductor/problems/registry.py`
+2. **Register your problem** in `sregym/conductor/problems/registry.py`
 
-3. **(Optional) Configure tasks** in `SREGym/conductor/tasklist.yml`:
+3. **(Optional) Configure tasks** in `sregym/conductor/tasklist.yml`:
    ```yaml
    my-problem-id:
      - detection
