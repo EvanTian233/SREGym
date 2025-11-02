@@ -1,0 +1,262 @@
+import os
+import shlex
+import subprocess
+from pathlib import Path
+from time import sleep
+
+# we added the ssh key to the ssh agent such that all of all the keys are carried with the ssh connection.
+SREGYM_DIR = Path(os.environ.get("SREGYM_DIR", "/users/lilygn/SREGym/sregym")).resolve()
+LOCAL_ENV = Path("/Users/lilygniedz/Documents/SREArena/SREArena/.env")  # your local .env
+REMOTE_ENV = "/users/lilygn/SREGym/.env"
+ENV = {
+    **os.environ,
+    "CI": "1",
+    "NONINTERACTIVE": "1",
+    "DEBIAN_FRONTEND": "noninteractive",
+    "SUDO_ASKPASS": "/bin/false",
+}
+TIMEOUT = 1800
+
+commands = [
+    f"cd {shlex.quote(str(SREGYM_DIR))}",
+    "uv venv -p $(which python3.12)",
+    "source .venv/bin/activate",
+    "uv sync",
+    "cd ..",
+    "cd SREGym",
+]
+
+scripts = [
+    "brew.sh",
+    "go.sh",
+    "docker.sh",
+    "kind.sh",
+    "kubectl.sh",
+]
+
+
+def run_shell_command(path: Path):
+    """Run a shell script with Bash: ensure exec bit, then 'bash <script>'."""
+    print(f"\n==> RUN: {path}")
+    if not path.exists():
+        print(f"Script {path.name} not found at {path}")
+        return
+
+    try:
+        cmd = f"set -euo pipefail; chmod +x {shlex.quote(str(path))} || true; bash {shlex.quote(str(path))}"
+        subprocess.run(
+            ["bash", "-lc", cmd],
+            env=ENV,
+            stdin=subprocess.DEVNULL,
+            timeout=TIMEOUT,
+            check=True,
+        )
+        print(f"Executed {path.name} successfully.")
+    except subprocess.TimeoutExpired:
+        print(f"Timed out executing {path}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing {path}: exit {e.returncode}")
+
+
+def installations():
+    SCRIPTS_DIR = Path.home() / "scripts"
+    for script in scripts:
+        path = SCRIPTS_DIR / script
+        if path.exists():
+            run_shell_command(path)
+        else:
+            print(f"Script {script} not found at {path}")
+            return
+    install_python()
+    install_git()
+
+
+def _brew_exists() -> bool:
+    for p in (
+        "/home/linuxbrew/.linuxbrew/bin/brew",
+        "/opt/homebrew/bin/brew",
+        "/usr/local/bin/brew",
+    ):
+        if Path(p).exists():
+            return True
+    try:
+        subprocess.run(
+            ["bash", "-lc", "command -v brew"],
+            env=ENV,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def run_submit(nodes_file: str = "nodes.txt"):
+    TMUX_CMD = "tmux new-session -d -s showcase_tmux2 'python3 scripts/auto_submit.py 2>&1 | tee submission_log.txt; sleep infinity;'"
+    TMUX_CMD2 = "tmux new-session -d -s main_tmux 'bash -c \"cd /users/lilygn/SREGym && /users/lilygn/SREGym/.venv/bin/python3 main.py 2>&1 | tee global_benchmark_log.txt;\" sleep infinity;'"
+    # TMUX_CMD2 = "tmux new-session -d -s main_tmux 'echo $PATH; sleep infinity;'"
+
+    with open(nodes_file) as f:
+        nodes = [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
+
+    for host in nodes:
+        print(f"=== {host} ===")
+        cmd = [
+            "ssh",
+            host,
+            f"{TMUX_CMD}",
+        ]
+        cmd2 = [
+            "ssh",
+            host,
+            f"{TMUX_CMD2}",
+        ]
+        try:
+            subprocess.run(cmd2, check=True)
+            print(f"Main script started successfully on {host}.")
+            sleep(20)
+            subprocess.run(cmd, check=True)
+            print(f"Submission script started successfully on {host}.")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Setup failed with return code {e.returncode}")
+
+
+def install_git():
+    try:
+        _install_brew_if_needed()
+        shellenv = _brew_shellenv_cmd()
+        subprocess.run(
+            ["bash", "-lc", f"{shellenv}; brew --version; brew install git"],
+            env=ENV,
+            stdin=subprocess.DEVNULL,
+            timeout=TIMEOUT,
+            check=True,
+        )
+        print("Git installed successfully.")
+    except subprocess.TimeoutExpired:
+        print("Timed out installing Git.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing Git: exit {e.returncode}")
+
+
+def clone(nodes_file: str = "nodes.txt", user: str = "lilygn", repo: str = "git@github.com:xlab-uiuc/SREGym.git"):
+    REMOTE_CMD = f"git clone {repo}"
+
+    with open(nodes_file) as f:
+        nodes = [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
+
+    for host in nodes:
+        print(f"=== {host} ===")
+        cmd = [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=no",
+            # "-o", "IdentitiesOnly=yes",
+            host,
+            f"{REMOTE_CMD}",
+        ]
+
+        subprocess.run(
+            ["scp", "-o", "StrictHostKeyChecking=no", str(LOCAL_ENV), f"{host}:/users/lilygn/SREGym/.env"], check=True
+        )
+
+        try:
+            subprocess.run(cmd, check=True)
+            subprocess.run(
+                ["ssh", "-o", "StrictHostKeyChecking=no", host, "sed -i '/^API_KEY.*/d' /users/lilygn/SREGym/.env"],
+                check=True,
+            )
+        except subprocess.CalledProcessError:
+            print(f"FAILED: {host}")
+
+
+def _brew_shellenv_cmd() -> str:
+    if Path("/home/linuxbrew/.linuxbrew/bin/brew").exists():
+        return 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
+    return 'eval "$(brew shellenv)"'
+
+
+def _install_brew_if_needed():
+    if _brew_exists():
+        return
+    print("Homebrew not found — installing non-interactively for Linux/macOS…")
+    cmd = r'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+    subprocess.run(
+        ["bash", "-lc", cmd],
+        env=ENV,
+        stdin=subprocess.DEVNULL,
+        timeout=TIMEOUT,
+        check=True,
+    )
+    print("Homebrew installed.")
+
+
+def install_python():
+    try:
+        _install_brew_if_needed()
+        shellenv = _brew_shellenv_cmd()
+        subprocess.run(
+            ["bash", "-lc", f"{shellenv}; brew --version; brew install python@3.12"],
+            env=ENV,
+            stdin=subprocess.DEVNULL,
+            timeout=TIMEOUT,
+            check=True,
+        )
+        print("Python installed successfully.")
+    except subprocess.TimeoutExpired:
+        print("Timed out installing Python.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing Python: exit {e.returncode}")
+
+
+def create_cluster():
+    try:
+        subprocess.run(["kind", "create", "cluster", "--config", "kind/kind-config-x86.yaml"], check=True)
+        print("Kubernetes cluster created successfully.")
+    except subprocess.TimeoutExpired:
+        print("Timed out creating Kubernetes cluster.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error creating Kubernetes cluster: exit {e.returncode}")
+
+
+def set_up_environment():
+    try:
+        shellenv = _brew_shellenv_cmd()
+        subprocess.run(
+            ["bash", "-lc", f"{shellenv}; command -v uv || brew install uv || python3 -m pip install --user uv"],
+            env=ENV,
+            stdin=subprocess.DEVNULL,
+            timeout=TIMEOUT,
+            check=True,
+        )
+    except Exception:
+        pass
+    create_cluster()
+    cmd = " && ".join(commands)
+    print(f"\n==> RUN: {cmd}")
+    try:
+        subprocess.run(
+            cmd,
+            shell=True,
+            executable="/bin/bash",
+            env=ENV,
+            stdin=subprocess.DEVNULL,
+            timeout=TIMEOUT,
+            check=True,
+        )
+        print("Setup completed successfully!")
+    except subprocess.TimeoutExpired:
+        print("Setup timed out.")
+    except subprocess.CalledProcessError as e:
+        print(f"Setup failed with return code {e.returncode}")
+
+
+if __name__ == "__main__":
+    # installations()
+    # clone()
+    run_submit()
+
+    # set_up_environment()
