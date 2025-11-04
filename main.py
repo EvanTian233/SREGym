@@ -12,13 +12,13 @@ from rich.console import Console
 
 from dashboard.dashboard_app import SREGymDashboardServer
 from dashboard.proxy import LogProxy
+from logger import init_logger
 from mcp_server.configs.load_all_cfg import mcp_server_cfg
 from mcp_server.sregym_mcp_server import app as mcp_app
 from sregym.agent_launcher import AgentLauncher
 from sregym.agent_registry import get_agent
 from sregym.conductor.conductor import Conductor
 from sregym.conductor.conductor_api import request_shutdown, run_api
-from logger import init_logger
 
 LAUNCHER = AgentLauncher()
 
@@ -42,6 +42,8 @@ def driver_loop(conductor: Conductor):
 
         all_results = []
         for pid in conductor.problems.get_problem_ids():
+            if pid != "namespace_memory_limit":
+                continue
             console.log(f"\n🔍 Starting problem: {pid}")
 
             conductor.problem_id = pid
@@ -128,9 +130,8 @@ def run_dashboard_server():
 
 
 def main():
+
     # set up the logger
-    logging.getLogger("sregym-global").setLevel(logging.INFO)
-    logging.getLogger("sregym-global").addHandler(LogProxy())
     init_logger()
 
     """
