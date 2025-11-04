@@ -42,8 +42,6 @@ def driver_loop(conductor: Conductor):
 
         all_results = []
         for pid in conductor.problems.get_problem_ids():
-            if pid != "namespace_memory_limit":
-                continue
             console.log(f"\n🔍 Starting problem: {pid}")
 
             conductor.problem_id = pid
