@@ -44,7 +44,6 @@ scripts = [
     "go.sh",
     "docker.sh",
     "kind.sh",
-    "kubectl.sh",
 ]
 
 
@@ -76,11 +75,23 @@ def scp_scripts_to_all(nodes_file: str = "nodes.txt"):
 REMOTE_SELF_PATH = "scripts/automating_tests.py"
 
 
+# def run_installations_all(nodes_file: str = "nodes.txt"):
+#     """SSH each node and run this file with --installations."""
+#     for host in _read_nodes(nodes_file):
+#         print(f"\n=== [SSH install] {host} ===")
+#         _run(["ssh", host, f"bash -lc 'python3 {REMOTE_SELF_PATH} --installations'"])
+
+
 def run_installations_all(nodes_file: str = "nodes.txt"):
-    """SSH each node and run this file with --installations."""
+    """SSH each node and run this file with --installations in a tmux session named 'installations'."""
+    session = "installations"
+    tmux_cmd = (
+        f"if tmux has-session -t {session}; then tmux kill-session -t {session}; fi; "
+        f"tmux new-session -d -s {session} "
+        f"'bash -lc \"python3 {REMOTE_SELF_PATH} --installations; sleep infinity\"'"
+    )
     for host in _read_nodes(nodes_file):
-        print(f"\n=== [SSH install] {host} ===")
-        _run(["ssh", host, f"bash -lc 'python3 {REMOTE_SELF_PATH} --installations'"])
+        _run(["ssh", host, tmux_cmd])
 
 
 def run_setup_env_all(nodes_file: str = "nodes.txt"):
@@ -91,7 +102,6 @@ def run_setup_env_all(nodes_file: str = "nodes.txt"):
             [
                 "ssh",
                 host,
-                # add eval brew shellenv before running python
                 'bash -lc \'eval "$($(brew --prefix 2>/dev/null || echo /home/linuxbrew/.linuxbrew)/bin/brew shellenv)"; '
                 "cd ~ && python3 scripts/automating_tests.py --setup-env'",
             ]
@@ -135,16 +145,9 @@ def installations():
 
 
 def _brew_exists() -> bool:
-    # for p in (
-    #     "/home/linuxbrew/.linuxbrew/bin/brew",
-    #     "/opt/homebrew/bin/brew",
-    #     "/usr/local/bin/brew",
-    # ):
-    #     if Path(p).exists():
-    #         return True
     try:
         subprocess.run(
-            "brew",
+            ["bash", "-lc", "command -v brew >/dev/null 2>&1"],
             env=ENV,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -152,18 +155,34 @@ def _brew_exists() -> bool:
             check=True,
         )
         return True
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
 
+# def _brew_exists() -> bool:
+#     try:
+#         subprocess.run(
+#             "brew",
+#             env=ENV,
+#             stdin=subprocess.DEVNULL,
+#             stdout=subprocess.DEVNULL,
+#             stderr=subprocess.DEVNULL,
+#             check=True,
+#         )
+#         return True
+#     except subprocess.CalledProcessError:
+#         return False
+
+
 def read_file(file_path: Path) -> list[str]:
-    with file_path.open("r", encoding="utf-8") as f:
-        return f.readlines()
+    with open(file_path) as f:
+        res = [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
+    return res
 
 
 def comment_out_problems():
     nodes = _read_nodes("nodes.txt")
-    problems = read_file("problems.txt")
+    problems = read_file("registry.txt")
     problem_count = len(problems) / len(nodes)
     mapping = {}
     m = len(problems)
@@ -185,9 +204,6 @@ def run_submit(nodes_file: str = "nodes.txt"):
         "tmux new-session -d -s submission -c /users/$USER/scripts "
         "'python3 auto_submit.py 2>&1 | tee -a ~/submission_log.txt; sleep infinity'"
     )
-
-    # TMUX_CMD = "tmux new-session -d -s showcase_tmux2 'cd /users/lilygn/scripts && python3 auto_submit.py 2>&1 | tee submission_log.txt; sleep infinity;'"
-    # TMUX_CMD2 = "tmux new-session -d -s main_tmux 'bash -c \"cd /users/lilygn/SREGym && /users/lilygn/SREGym/.venv/bin/python3 main.py 2>&1 | tee global_benchmark_log.txt;\" sleep infinity;'"
     # TMUX_CMD2 = "tmux new-session -d -s main_tmux 'echo $PATH; sleep infinity;'"
     TMUX_CMD2 = (
         "tmux new-session -d -s main_tmux "
@@ -257,22 +273,9 @@ def clone(nodes_file: str = "nodes.txt", user: str = "lilygn", repo: str = "git@
             "ssh",
             "-o",
             "StrictHostKeyChecking=no",
-            # "-o", "IdentitiesOnly=yes",
             host,
             f"{REMOTE_CMD}",
         ]
-
-        # try:
-        #     #subprocess.run(cmd, check=True)
-        #     subprocess.run(
-        #     ["scp", "-o", "StrictHostKeyChecking=no", str(LOCAL_ENV), f"{host}:$HOME/SREGym/.env"], check=True
-        # )
-        #     subprocess.run(
-        #         ["ssh", "-o", "StrictHostKeyChecking=no", host, "sed -i '/^API_KEY.*/d' /users/lilygn/SREGym/.env"],
-        #         check=True,
-        #     )
-        # except subprocess.CalledProcessError:
-        #     print(f"FAILED: {host}")
         try:
             subprocess.run(cmd, check=True)
             subprocess.run(
@@ -374,28 +377,38 @@ def _resolve_kind_config() -> str | None:
 
 def create_cluster():
     cfg = _resolve_kind_config()
-    if cfg:
-        subprocess.run(
-            ["bash", "-lc", f"kind delete cluster || true; kind create cluster --config {shlex.quote(cfg)}"],
-            check=True,
-            cwd=str(SREGYM_ROOT),
-        )
-    else:
-        subprocess.run(
-            ["bash", "-lc", "kind delete cluster || true; kind create cluster"],
-            check=True,
-            cwd=str(SREGYM_ROOT),
-        )
 
-
-# def create_cluster():
-#     try:
-#         subprocess.run(["kind", "create", "cluster", "--config", "kind/kind-config-x86.yaml"], check=True, cwd="/users/lilygn/SREGym",)
-#         print("Kubernetes cluster created successfully.")
-#     except subprocess.TimeoutExpired:
-#         print("Timed out creating Kubernetes cluster.")
-#     except subprocess.CalledProcessError as e:
-#         print(f"Error creating Kubernetes cluster: exit {e.returncode}")
+    for node in _read_nodes("nodes.txt"):
+        if cfg:
+            print(f"\n=== [Create Kind Cluster] {node} ===")
+            TMUX_SESSION = "cluster_setup"
+            cmd = [
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=no",
+                node,
+                f"tmux new-session -d -s {TMUX_SESSION} "
+                f"'kind create cluster --config {shlex.quote(cfg)}; "
+                f"sleep infinity'",
+            ]
+            subprocess.run(
+                cmd,
+                check=True,
+                cwd=str(SREGYM_ROOT),
+            )
+        else:
+            cmd = [
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=no",
+                node,
+                f"tmux new-session -d -s {TMUX_SESSION} " f"'kind create cluster; " f"sleep infinity'",
+            ]
+            subprocess.run(
+                cmd,
+                check=True,
+                cwd=str(SREGYM_ROOT),
+            )
 
 
 def install_kubectl():
@@ -408,21 +421,18 @@ def install_kubectl():
         print(f"\n=== [Install kubectl] {node} ===")
         # cmd2 = (  f"ssh -o StrictHostKeyChecking=no {node} "
         #     "\"bash -lc 'cd ~/scripts && chmod +x brew.sh && bash brew.sh'\"")
-
-        cmd = f'ssh -o StrictHostKeyChecking=no {node} "bash -ic \\"brew install kubectl helm\\""'
-
-        # cmd3 = (
-        #     f"ssh -o StrictHostKeyChecking=no {node} \"bash -ic \\\"echo $PATH\\\"\""
+        #         cmd = (
+        #     f'ssh -o StrictHostKeyChecking=no {node} '
+        #     '"tmux new-session -d -s installations_kubectl '
+        #     '\'bash -lc \\\"brew install kubectl helm\\\"\'"'
         # )
-        print(f"WHAT IS PATH??")
+        cmd = f'ssh -o StrictHostKeyChecking=no {node} "bash -ic \\"brew install kubectl helm\\""'
         subprocess.run(
             cmd,
             check=True,
             shell=True,
             executable="/bin/zsh",
         )
-        # subprocess.run(cmd2, shell=True, check=True)
-        # subprocess.run(cmd, shell=True, check=True)
     print("Kubectl installed successfully on all nodes.")
 
 
@@ -439,19 +449,8 @@ def set_up_environment():
     except Exception:
         pass
     nodes = _read_nodes("nodes.txt")
-    TMUX_SESSION = "cluster_setup"
-    for node in nodes:
-        print(f"\n=== [SET UP ENV] {node} ===")
-        cmd = [
-            "ssh",
-            "-o",
-            "StrictHostKeyChecking=no",
-            node,
-            f"tmux new-session -d -s {TMUX_SESSION} "
-            f"'cd ~/SREGym && kind create cluster --config kind/kind-config-arm.yaml; "
-            f"sleep infinity'",
-        ]
-        subprocess.run(cmd, check=True)
+    # TMUX_SESSION = "cluster_setup"
+    create_cluster()
     cmd = " && ".join(commands)
     print(f"\n==> RUN: {cmd}")
     try:
@@ -489,8 +488,8 @@ if __name__ == "__main__" and "--setup-env" in sys.argv:
 if __name__ == "__main__":
     scp_scripts_to_all("nodes.txt")
     # clone()
-    comment_out_problems()
-    install_kubectl()
+    # comment_out_problems()
+    # install_kubectl()
     run_installations_all("nodes.txt")
     copy_env()
     run_setup_env_all("nodes.txt")
@@ -498,6 +497,3 @@ if __name__ == "__main__":
     # install_kubectl()
     kill_server()
     run_submit()
-
-# if __name__ == "__main__":
-#     run_submit()
