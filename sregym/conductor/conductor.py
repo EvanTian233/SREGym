@@ -175,6 +175,9 @@ class Conductor:
 
             self.logger.info(f"[ENV] Injected fault")
 
+            if hasattr(self.problem, "localization_oracle"):
+                self.problem.localization_oracle.load_localization_checkpoint()
+
             # FIXME: Disabled until https://github.com/xlab-uiuc/SREGym/issues/296 is complete
             # self.configure_transient_issues()
             # if self.transient_config["switch"]:
