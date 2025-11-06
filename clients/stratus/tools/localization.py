@@ -19,6 +19,7 @@ Use this tool to retrieve the UID of a specified resource.
     Args:
         resource_type (str): The type of the resource (e.g., 'pod', 'service', 'deployment').
         resource_name (str): The name of the resource.
+        namespace (str): The namespace of the resource.
     Returns:
         str: The UID of the specified resource.
 """
