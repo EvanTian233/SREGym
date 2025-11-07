@@ -10,13 +10,8 @@ from pathlib import Path
 from time import sleep
 
 # we added the ssh key to the ssh agent such that all of all the keys are carried with the ssh connection.
+base = Path(__file__).resolve().parent
 
-SREGYM_DIR = Path("/users/lilygn/SREGym").resolve()
-LOCAL_ENV = Path("/Users/lilygniedz/Documents/SREArena/SREArena/.env")
-
-SREGYM_ROOT = Path("/users/lilygn/SREGym").resolve()
-KIND_DIR = SREGYM_ROOT / "kind"
-REMOTE_ENV = "/users/lilygn/SREGym/.env"
 ENV = {
     **os.environ,
     "CI": "1",
@@ -25,23 +20,8 @@ ENV = {
     "SUDO_ASKPASS": "/bin/false",
 }
 TIMEOUT = 1800
+base = Path(__file__).resolve().parent
 
-# commands = [
-#     f"cd {shlex.quote(str(SREGYM_DIR))}",
-#     "uv venv -p $(which python3.12)",
-#     "source .venv/bin/activate",
-#     "uv sync",
-#     "cd ..",
-#     #"cd SREGym",
-# ]
-commands = [
-    "cd /users/lilygn/SREGym",
-    'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"',
-    "command -v uv >/dev/null 2>&1 || brew install uv || python3 -m pip install --user uv",
-    'uv venv -p "$(command -v python3.12 || command -v python3)"',
-    "source .venv/bin/activate",
-    "uv sync",
-]
 
 scripts = [
     "brew.sh",
@@ -51,8 +31,18 @@ scripts = [
 ]
 
 
+def init_user_paths(user: str):
+    """Initialize all global paths and user-dependent commands after username is known."""
+    global SREGYM_DIR, SREGYM_ROOT, KIND_DIR, REMOTE_ENV, LOCAL_ENV, REMOTE_SELF_PATH
+    SREGYM_DIR = Path(f"/users/{user}/SREGym").resolve()
+    SREGYM_ROOT = SREGYM_DIR
+    KIND_DIR = SREGYM_ROOT / "kind"
+    REMOTE_ENV = f"/users/{user}/SREGym/.env"
+    LOCAL_ENV = Path(__file__).resolve().parent.parent.parent / ".env"
+    REMOTE_SELF_PATH = f"/users/{user}/scripts/automating_tests.py"
+
+
 def _read_nodes(path: str = "nodes.txt") -> list[str]:
-    base = Path(__file__).resolve().parent  # directory of this script
     full_path = (base / path).resolve()
     if not full_path.exists():
         raise FileNotFoundError(f"nodes.txt not found at {full_path}")
@@ -65,27 +55,16 @@ def _run(cmd: list[str]):
     subprocess.run(cmd)
 
 
-def scp_scripts_to_all(nodes_file: str = "nodes.txt"):
+def scp_scripts_to_all(user, nodes_file: str = "nodes.txt"):
     """scp -r LOCAL_COPY_SRC -> ~/scripts on each node."""
-    LOCAL_COPY_SRC = "/Users/lilygniedz/Documents/SREArena/SREArena/tests/scripts"
 
-    if not Path(LOCAL_COPY_SRC).exists():
-        raise FileNotFoundError(f"LOCAL_COPY_SRC not found: {LOCAL_COPY_SRC}")
+    if not Path(base).exists():
+        raise FileNotFoundError(f"LOCAL_COPY_SRC not found: {base}")
     for host in _read_nodes(nodes_file):
-        _run(["scp", "-r", "-o", "StrictHostKeyChecking=no", LOCAL_COPY_SRC, f"{host}:~"])
+        _run(["scp", "-r", "-o", "StrictHostKeyChecking=no", str(base), f"{host}:~"])
 
 
-REMOTE_SELF_PATH = "scripts/automating_tests.py"
-
-
-# def run_installations_all(nodes_file: str = "nodes.txt"):
-#     """SSH each node and run this file with --installations."""
-#     for host in _read_nodes(nodes_file):
-#         print(f"\n=== [SSH install] {host} ===")
-#         _run(["ssh", host, f"bash -lc 'python3 {REMOTE_SELF_PATH} --installations'"])
-
-
-def run_installations_all(nodes_file: str = "nodes.txt"):
+def run_installations_all(user, nodes_file: str = "nodes.txt"):
     """SSH each node and run this file with --installations in a tmux session named 'installations'."""
     session = "installations"
     tmux_cmd = (
@@ -97,7 +76,7 @@ def run_installations_all(nodes_file: str = "nodes.txt"):
         _run(["ssh", host, tmux_cmd])
 
 
-def run_setup_env_all(nodes_file: str = "nodes.txt"):
+def run_setup_env_all(user, nodes_file: str = "nodes.txt"):
     """SSH each node and run this file with --setup-env in a detached tmux session."""
     for host in _read_nodes(nodes_file):
         print(f"\n=== [SSH setup-env] {host} ===")
@@ -112,7 +91,7 @@ def run_setup_env_all(nodes_file: str = "nodes.txt"):
         )
 
         _run(["ssh", host, remote_tmux])
-        print(f"✅ Started tmux session 'setup_env' on {host} (log: ~/setup_env_log.txt)")
+        print(f"Started tmux session 'setup_env' on {host} (log: ~/setup_env_log.txt)")
 
 
 def run_shell_command(path: Path):
@@ -151,7 +130,6 @@ def installations():
     install_git()
 
 
-# make it take parameter node
 def _brew_exists(node: str) -> bool:
     """Check if Homebrew is installed on a remote node via SSH."""
     try:
@@ -175,110 +153,10 @@ def _brew_exists(node: str) -> bool:
         return False
 
 
-# def _brew_exists() -> bool:
-#     try:
-#         subprocess.run(
-#             "brew",
-#             env=ENV,
-#             stdin=subprocess.DEVNULL,
-#             stdout=subprocess.DEVNULL,
-#             stderr=subprocess.DEVNULL,
-#             check=True,
-#         )
-#         return True
-#     except subprocess.CalledProcessError:
-#         return False
-
-
 def read_file(file_path: Path) -> list[str]:
     with open(file_path) as f:
         res = [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
     return res
-
-
-# def comment_out_problems():
-#     nodes = _read_nodes("nodes.txt")
-#     problems = read_file("registry.txt")
-
-#     for node in nodes:
-#         print(f"\n=== [Comment out problems on {node}] ===")
-
-#         remote_py = r"""
-# import re, pathlib, json
-
-# p = pathlib.Path('~/SREGym/sregym/conductor/problems/registry.py').expanduser()
-# backup = p.with_suffix('.py.bak')
-# backup.write_text(p.read_text())  # create a backup before modifying
-# lines = p.read_text().splitlines()
-
-# keys = set({PROBLEMS_JSON})
-# out = []
-# in_registry = False
-# brace_depth = 0
-# commenting = False
-# open_parens = 0
-
-# for line in lines:
-#     stripped = line.strip()
-
-#     # Detect start of PROBLEM_REGISTRY dict
-#     if not in_registry and stripped.startswith("self.PROBLEM_REGISTRY") and stripped.endswith("{"):
-#         in_registry = True
-#         brace_depth = 1
-#         out.append(line)
-#         continue
-
-#     if in_registry:
-#         # Update brace nesting count
-#         brace_depth += line.count("{") - line.count("}")
-
-#         # If we've closed the registry dictionary, exit
-#         if brace_depth <= 0:
-#             in_registry = False
-#             commenting = False
-#             out.append(line)
-#             continue
-
-#         # If currently commenting
-#         if commenting:
-#             out.append("#" + line)
-#             open_parens += line.count("(") - line.count(")")
-#             # stop commenting when parentheses close and line ends with comma
-#             if open_parens <= 0 and line.strip().endswith(","):
-#                 commenting = False
-#             continue
-
-#         # Check for a problem key that matches one from registry.txt
-#         for key in keys:
-#             if re.search(rf'"{re.escape(key)}"\s*:', line):
-#                 commenting = True
-#                 open_parens = line.count("(") - line.count(")")
-#                 out.append("#" + line)
-#                 break
-#         else:
-#             out.append(line)
-#     else:
-#         out.append(line)
-
-# p.write_text("\n".join(out) + "\n")
-# print("✅ Finished safely. Backup at:", backup)
-# """.replace("{PROBLEMS_JSON}", json.dumps(problems))
-
-#         quoted_py = shlex.quote(remote_py)
-
-#         cmd = [
-#             "ssh",
-#             "-o", "StrictHostKeyChecking=no",
-#             node,
-#             "python3",
-#             "-c",
-#             quoted_py,
-#         ]
-
-#         try:
-#             subprocess.run(cmd, check=True)
-#         except subprocess.CalledProcessError as e:
-#             print(f"❌ Failed on {node}: {e}")
 
 
 def comment_out_problems():
@@ -299,10 +177,10 @@ def comment_out_problems():
                 subprocess.run(cmd, shell=True, check=True)
 
 
-def run_submit(nodes_file: str = "nodes.txt"):
+def run_submit(user, nodes_file: str = "nodes.txt"):
     TMUX_CMD = (
         "tmux kill-session -t submission 2>/dev/null || true; "
-        "tmux new-session -d -s submission -c /users/$USER/scripts "
+        f"tmux new-session -d -s submission -c /users/{user}/scripts "
         "'python3 auto_submit.py 2>&1 | tee -a ~/submission_log.txt; sleep infinity'"
     )
     # TMUX_CMD2 = "tmux new-session -d -s main_tmux 'echo $PATH; sleep infinity;'"
@@ -313,9 +191,8 @@ def run_submit(nodes_file: str = "nodes.txt"):
         'bash -ic "echo PATH=\\$PATH; '
         "command -v kubectl; kubectl version --client || true; "
         "command -v helm || true; "
-        "cd /users/lilygn/SREGym && "
-        "source .venv/bin/activate && "
-        "python main.py 2>&1 | tee -a global_benchmark_log_$(date +%Y-%m-%d).txt; "
+        f"cd /users/{user}/SREGym && "
+        "~/SREGym/.venv/bin/python3 main.py 2>&1 | tee -a global_benchmark_log_$(date +%Y-%m-%d).txt; "
         "sleep infinity\"'"
     )
 
@@ -363,7 +240,7 @@ def install_git():
         print(f"Error installing Git: exit {e.returncode}")
 
 
-def clone(nodes_file: str = "nodes.txt", user: str = "lilygn", repo: str = "git@github.com:SREGym/SREGym.git"):
+def clone(nodes_file: str = "nodes.txt", repo: str = "git@github.com:SREGym/SREGym.git"):
     """
     Clone the repo on all remote nodes using local SSH agent forwarding.
     """
@@ -477,23 +354,13 @@ def _resolve_kind_config() -> str | None:
     return None
 
 
-# copy .ssh folder onto the machine
-def create_cluster():
+def create_cluster(user):
 
     for node in _read_nodes("nodes.txt"):
         print(f"\n=== [Create Kind Cluster] {node} ===")
         TMUX_SESSION = "cluster_setup"
-        # cmd = [
-        #     "ssh",
-        #     "-o",
-        #     "StrictHostKeyChecking=no",
-        #     node,
-        #     f"tmux new-session -d -s {TMUX_SESSION} "
-        #     f"'kind create cluster --config {shlex.quote(cfg)}; "
-        #     f"sleep infinity'",
-        # ]
-        cmd = f'ssh -o StrictHostKeyChecking=no {node} "bash -ic \\"tmux new-session -d -s cluster_setup \'kind create cluster --config /users/lilygn/SREGym/kind/kind-config-x86.yaml; sleep infinity\'\\""'
-        # cmd = f'ssh -o StrictHostKeyChecking=no {node} "bash -ic ls"'
+
+        cmd = f'ssh -o StrictHostKeyChecking=no {node} "bash -ic \\"tmux new-session -d -s cluster_setup \'kind create cluster --config /users/{user}/SREGym/kind/kind-config-x86.yaml; sleep infinity\'\\""'
 
         subprocess.run(
             cmd,
@@ -501,19 +368,6 @@ def create_cluster():
             shell=True,
             executable="/bin/zsh",
         )
-
-        #     cmd = [
-        #         "ssh",
-        #         "-o",
-        #         "StrictHostKeyChecking=no",
-        #         node,
-        #         f"tmux new-session -d -s cluster-setup " f"'kind create cluster; " f"sleep infinity'",
-        #     ]
-        #     subprocess.run(
-        #         cmd,
-        #         check=True,
-        #         cwd=str(SREGYM_ROOT),
-        #     )
 
 
 def copy_env():
@@ -543,24 +397,6 @@ def install_kubectl():
 
     for node in _read_nodes("nodes.txt"):
         print(f"\n=== [Install kubectl] {node} ===")
-        # cmd2 = (  f"ssh -o StrictHostKeyChecking=no {node} "
-        #     "\"bash -lc 'cd ~/scripts && chmod +x brew.sh && bash brew.sh'\"")
-        #         cmd = (
-        #     f'ssh -o StrictHostKeyChecking=no {node} '
-        #     '"tmux new-session -d -s installations_kubectl '
-        #     '\'bash -lc \\\"brew install kubectl helm\\\"\'"'
-        # )
-        # SECOND VERSION:
-        #     cmd = (
-        # f'ssh -o StrictHostKeyChecking=no {node} '
-        # '"tmux new-session -d -s install_kubectl '
-        # '\'bash -lc \\"brew install kubectl helm\\"; sleep infinity\'"'
-        #     )
-        # subprocess.run(
-        #     f'ssh -o StrictHostKeyChecking=no {host} "bash -ic \\"eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv); brew install kubectl helm\\""',
-        #     shell=True,
-        # )
-
         cmd = f'ssh -o StrictHostKeyChecking=no {node} "bash -ic \\"brew install kubectl helm\\""'
         subprocess.run(
             cmd,
@@ -584,8 +420,14 @@ def set_up_environment():
     except Exception:
         pass
     nodes = _read_nodes("nodes.txt")
-    # TMUX_SESSION = "cluster_setup"
-    # create_cluster()
+    commands = [
+        f"cd ~/SREGym",
+        'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"',
+        "command -v uv >/dev/null 2>&1 || brew install uv || python3 -m pip install --user uv",
+        'uv venv -p "$(command -v python3.12 || command -v python3)"',
+        "source .venv/bin/activate",
+        "uv sync",
+    ]
     cmd = " && ".join(commands)
     print(f"\n==> RUN: {cmd}")
     try:
@@ -605,7 +447,7 @@ def set_up_environment():
         print(f"Setup failed with return code {e.returncode}")
 
 
-def collect_logs(nodes_file: str = "nodes.txt"):
+def collect_logs(user, nodes_file: str = "nodes.txt"):
     """
     Copy log files from all nodes into a local folder called 'node_logs'.
 
@@ -617,15 +459,13 @@ def collect_logs(nodes_file: str = "nodes.txt"):
     local_dir.mkdir(exist_ok=True)
     today = date.today().strftime("%Y-%m-%d")
     day = "$(date +%Y-%m-%d)"
-    # remote_log = f"/users/lilygn/SREGym/global_benchmark_log_{day}.txt"
-    remote_log = f"/users/lilygn/SREGym/global_benchmark_*.txt"
+    remote_log = f"/users/{user}/SREGym/global_benchmark_*.txt"
 
     nodes = _read_nodes(nodes_file)
 
     for node in nodes:
         node_name = node.split("@")[-1]
 
-        # local_path = local_dir / f"{node_name}.log"
         local_path = local_dir / node_name
         local_path.mkdir(exist_ok=True)
 
@@ -661,19 +501,21 @@ if __name__ == "__main__" and "--setup-env" in sys.argv:
     sys.exit(0)
 
 if __name__ == "__main__":
-    scp_scripts_to_all("nodes.txt")
-    clone()
-    comment_out_problems()
+    user = input("Please enter your username to continue: ").strip()
+    init_user_paths(user)
     kill_server()
 
-    run_installations_all("nodes.txt")
-    sleep(2)
+    # scp_scripts_to_all(user, "nodes.txt")
+    clone(nodes_file="nodes.txt")
+    # comment_out_problems()
+
+    run_installations_all(user, "nodes.txt")
+    sleep(50)
     install_kubectl()
-    create_cluster()
+    create_cluster(user)
     sleep(30)
     copy_env()
-    run_setup_env_all("nodes.txt")
-    sleep(30)
-    # kill_server()
-    run_submit()
-    collect_logs()
+    run_setup_env_all(user, "nodes.txt")
+    sleep(90)
+    run_submit(user, "nodes.txt")
+    collect_logs(user, "nodes.txt")
