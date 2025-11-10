@@ -12,17 +12,13 @@
 </div>
 
 <h2 id="overview">🔍 Overview</h2>
-<!-- FIXME: We need a convincing paragraph here that shows our advantage over prior works -->
-SREGym is a unified platform to enable the design, development, and evaluation of AI agents for Site Reliability Engineering (SRE). The core idea is to create live system environments for SRE agents to solve real-world problems. SREGym also provides a comprehensive SRE benchmark suite with a wide variety of problems for evaluating SRE agents and for training next-generation AI agents.
+SREGym is an AI-native platform to enable the design, development, and evaluation of AI agents for Site Reliability Engineering (SRE). The core idea is to create live system environments for SRE agents to solve real-world SRE problems. SREGym provides a comprehensive SRE benchmark suite with a wide variety of problems for evaluating SRE agents and also for training next-generation AI agents. 
+
+SREGym is inspired by our prior work on AIOpsLab and ITBench. It is architectured with AI-native usability and extensibility as first-class principles. The SREGym benchmark suites contain 88 different SRE problems. It supports all the problems from AIOpsLab and ITBench, and includes new problems such as OS-level faults, metastable failures, and concurrent failures. See our [registry](https://sregym.com/problems/problem-repertoire/head) for a complete list of problems.
+
 
 <!-- FIXME: Update this figure. -->
 ![SREGym Architecture Figure](./assets/SREGymFigure.png)
-
-<!-- Figure note: We list some of the applications, we should list some of the faults as well in the figure/ -->
-<!-- Take the problem set out, not as necessary for the figure -->
-<!-- Have a big amount of space for the problem definition -->
-<!-- Use a black background for the figure -->
-See our [registry](https://sregym.com/problems/problem-repertoire/head) for a complete list of problems.
 
 <h2 id="📦installation">📦 Installation</h2>
 
