@@ -1,3 +1,15 @@
+faulty_image_correlated
+update_incompatible_correlated
+incorrect_image
+incorrect_port_assignment
+misconfig_app_hotel_res
+missing_env_variable_astronomy_shop
+revoke_auth_mongodb-1
+revoke_auth_mongodb-2
+storage_user_unregistered-1
+storage_user_unregistered-2
+valkey_auth_disruption
+valkey_memory_disruption
 capacity_decrease_rpc_retry_storm
 gc_capacity_degradation
 load_spike_rpc_retry_storm
