@@ -47,7 +47,7 @@ def _read_nodes(path: str = "nodes.txt") -> list[str]:
     if not full_path.exists():
         raise FileNotFoundError(f"nodes.txt not found at {full_path}")
     with open(full_path) as f:
-        return [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
+        return [ln.strip() for ln in f if ln.strip()]
 
 
 def _run(cmd: list[str]):
