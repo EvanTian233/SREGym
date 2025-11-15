@@ -515,20 +515,30 @@ if __name__ == "__main__" and "--setup-env" in sys.argv:
 
 if __name__ == "__main__":
     user = input("Please enter your username to continue: ").strip()
+    # initialize global variables
     init_user_paths(user)
+
+    # kills any existing tmux servers
     kill_server()
 
+    # copying all scripts
     scp_scripts_to_all(user, "nodes.txt")
+    # clone repo
     clone(nodes_file="nodes.txt")
+    # comment out problems that we don't test
     comment_out_problems()
 
+    # installs prereqs
     run_installations_all(user, "nodes.txt")
     sleep(50)
     install_kubectl()
     create_cluster(user)
     sleep(30)
     copy_env()
+    # set up python environment
     run_setup_env_all(user, "nodes.txt")
     sleep(90)
+    # runs auto submitting script to keep benchmark going
     run_submit(user, "nodes.txt")
+    # collects any logs
     collect_logs(user, "nodes.txt")
