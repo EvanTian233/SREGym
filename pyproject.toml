@@ -100,8 +100,6 @@ dependencies = [
     "opentelemetry-sdk==1.31.1",
     "opentelemetry-semantic-conventions==0.52b1",
     "opentelemetry-util-http==0.52b1",
-    "outlines==0.1.11",
-    "outlines-core==0.1.26",
     "packaging>=24.0",
     "pandas==2.2.3",
     "paramiko==3.5.1",
