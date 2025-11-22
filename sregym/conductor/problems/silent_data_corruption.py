@@ -28,7 +28,7 @@ class SilentDataCorruption(Problem):
         target_deploy: str = "mongodb-geo",
         namespace: str = "hotel-reservation",
         strategy: SilentDataCorruptionStrategy = SilentDataCorruptionStrategy.BOTH_CORRUPT,
-        probability: int = 100, # % probability 
+        probability: int = 5, # % probability 
         up_interval: int = 0,  # Seconds device is healthy
         down_interval: int = 1,  # Seconds device corrupts data
     ):
