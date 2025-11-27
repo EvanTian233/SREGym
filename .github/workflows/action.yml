@@ -8,7 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write
 
     steps:
     - name: Checkout
@@ -16,19 +15,19 @@ jobs:
 
     - name: Download CodeQL CLI
       run: |
-        curl -L https://github.com/github/codeql-action/releases/latest/download/codeql-linux64.zip -o codeql.zip
+        curl -L https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -o codeql.zip
         unzip codeql.zip
         mv codeql /opt/codeql
         echo "/opt/codeql" >> $GITHUB_PATH
 
-    - name: Create CodeQL Database
+    - name: Create CodeQL DB
       run: |
         codeql database create sreql-db \
           --language=python \
           --source-root=. \
           --overwrite
 
-    - name: Run SRE-QL Queries (CSV)
+    - name: Run Queries (CSV)
       run: |
         codeql database analyze sreql-db \
           "tests/sre-ql/queries" \
