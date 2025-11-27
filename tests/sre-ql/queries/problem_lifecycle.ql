@@ -13,10 +13,7 @@ class ApplicationSubclass extends Class {
     this.getABase().(Name).getId() in ["Application", "Problem"]
     or
     // Transitive inheritance (inherits through other classes)
-    exists(Class base |
-      base.getName() in ["Application", "Problem"] and
-      this.getABase+() = base
-    )
+    this.getABaseClass+().getName() in ["Application", "Problem"]
   }
 }
 

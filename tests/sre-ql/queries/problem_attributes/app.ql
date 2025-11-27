@@ -13,10 +13,7 @@ class ProblemSubclass extends Class {
     this.getABase().(Name).getId() = "Problem"
     or
     // Transitive inheritance (inherits through other classes)
-    exists(Class base |
-      base.getName() = "Problem" and
-      this.getABase+() = base
-    )
+    this.getABaseClass+().getName() = "Problem"
   }
 }
 
