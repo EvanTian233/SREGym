@@ -20,7 +20,15 @@ class NoiseManager:
             cls._instance.running = False
             cls._instance._background_thread = None
             cls._instance.problem_context = {}
+            cls._instance.current_stage = None
         return cls._instance
+
+    def set_stage(self, stage: str):
+        """
+        Set the current problem stage (e.g. 'diagnosis', 'mitigation').
+        """
+        self.current_stage = stage
+        logger.info(f"NoiseManager stage updated to: {stage}")
 
     def set_problem_context(self, context: Dict[str, Any]):
         """
@@ -65,6 +73,9 @@ class NoiseManager:
         """
         # Filter noises that are triggered by tool calls (Temporal injection)
         for noise in self.noises:
+            if not noise.is_active(self.current_stage):
+                continue
+                
             # Check if this noise is configured to react to this tool/command
             # This logic depends on how we define the config for temporal injection
             # For now, we pass the context to the noise and let it decide
@@ -83,6 +94,9 @@ class NoiseManager:
         Hook called after a tool execution to potentially modify the result.
         """
         for noise in self.noises:
+            if not noise.is_active(self.current_stage):
+                continue
+
             try:
                 result = noise.modify_result(context={
                     "trigger": "tool_result",
@@ -120,6 +134,9 @@ class NoiseManager:
     def _background_loop(self):
         while self.running:
             for noise in self.noises:
+                if not noise.is_active(self.current_stage):
+                    continue
+
                 try:
                     noise.inject(context={"trigger": "background"})
                 except Exception as e:

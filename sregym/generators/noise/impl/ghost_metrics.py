@@ -35,13 +35,23 @@ class GhostMetricsNoise(BaseNoise):
                 data = ast.literal_eval(result)
                 
                 if isinstance(data, dict) and "result" in data:
+                    result_type = data.get("resultType", "vector")
+                    
                     ghost_entry = {
                         "metric": {
                             "__name__": self.metric_name,
                             **self.labels
-                        },
-                        "value": [time.time(), str(random.randint(*self.value_range))]
+                        }
                     }
+                    
+                    # Generate value
+                    val = [time.time(), str(random.randint(*self.value_range))]
+                    
+                    if result_type == "matrix":
+                        ghost_entry["values"] = [val]
+                    else:
+                        ghost_entry["value"] = val
+
                     data["result"].append(ghost_entry)
                     return str(data)
                     

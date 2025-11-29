@@ -16,6 +16,7 @@ class CicdNoise(BaseNoise):
         self.last_update_time = 0
         self.target_deployments = config.get("deployments", []) # List of deployment names, or empty for random
         self.namespace = config.get("namespace", "default")
+        self.last_target = None
         self.context = {}
 
     def inject(self, context=None):
@@ -48,9 +49,18 @@ class CicdNoise(BaseNoise):
             self.kubectl.trigger_rollout(target, target_ns)
             
             self.last_update_time = now
+            self.last_target = (target, target_ns)
             
         except Exception as e:
             logger.error(f"Failed to inject CI/CD noise: {e}")
 
     def clean(self):
-        pass
+        if self.last_target:
+            target, ns = self.last_target
+            logger.info(f"Waiting for CI/CD rollout to finish on {target} in {ns}")
+            try:
+                # Wait for rollout to complete to ensure clean state for evaluation
+                self.kubectl.exec_command(f"kubectl rollout status deployment {target} -n {ns} --timeout=60s")
+            except Exception as e:
+                logger.error(f"Failed to wait for rollout completion: {e}")
+            self.last_target = None

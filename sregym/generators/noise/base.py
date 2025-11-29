@@ -5,6 +5,8 @@ class BaseNoise(ABC):
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.enabled = config.get("enabled", True)
+        # Default to all stages if not specified
+        self.stages = config.get("stages", None) 
 
     @abstractmethod
     def inject(self, context: Optional[Dict[str, Any]] = None):
@@ -33,5 +35,12 @@ class BaseNoise(ABC):
         """
         return result
 
-    def is_active(self) -> bool:
-        return self.enabled
+    def is_active(self, current_stage: str = None) -> bool:
+        if not self.enabled:
+            return False
+        
+        # If stages are configured, check if current_stage is in the list
+        if self.stages is not None and current_stage is not None:
+            return current_stage in self.stages
+            
+        return True

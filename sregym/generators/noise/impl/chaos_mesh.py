@@ -21,7 +21,7 @@ class ChaosMeshNoise(BaseNoise):
         self.trigger_config = config.get("trigger", {})
         self.last_injection_time = 0
         self.duration = config.get("duration", 180)
-        self.cooldown = config.get("cooldown", 30)
+        self.cooldown = config.get("cooldown", 120)
         self.namespace = config.get("namespace", "chaos-mesh")
         self.context = {}
         

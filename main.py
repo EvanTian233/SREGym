@@ -206,10 +206,28 @@ def main():
     parser.add_argument(
         "--use-external-harness", action="store_true", help="For use in external harnesses, deploy the fault and exit."
     )
+    parser.add_argument(
+        "--noise-config",
+        type=str,
+        default=None,
+        help="Path to noise configuration YAML file",
+    )
     args = parser.parse_args()
 
     # set up the logger
     init_logger()
+
+    # Initialize Noise Manager if config is provided
+    nm = None
+    if args.noise_config:
+        try:
+            from sregym.generators.noise.manager import get_noise_manager
+            nm = get_noise_manager()
+            nm.load_config(args.noise_config)
+            # nm.start_background_noises()  <-- Moved to Conductor.start_problem
+            print(f"✅ Noise manager initialized with config: {args.noise_config}")
+        except Exception as e:
+            print(f"⚠️ Failed to initialize noise manager: {e}")
 
     # Start dashboard in a separate process
     dashboard_process = None
@@ -243,6 +261,14 @@ def main():
         # If interrupted, still try to shut down cleanly
         request_shutdown()
     finally:
+        # Stop noise manager if it was initialized
+        if nm:
+            try:
+                print("Stopping noise manager...")
+                nm.stop()
+            except Exception as e:
+                print(f"⚠️ Error stopping noise manager: {e}")
+
         # Give driver a moment to finish setting results
         driver_thread.join(timeout=5)
 

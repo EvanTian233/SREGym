@@ -13,6 +13,7 @@ from sregym.conductor.problems.registry import ProblemRegistry
 from sregym.conductor.utils import is_ordered_subset
 from sregym.generators.fault.inject_remote_os import RemoteOSFaultInjector
 from sregym.generators.fault.inject_virtual import VirtualizationFaultInjector
+from sregym.generators.noise.manager import get_noise_manager
 from sregym.service.apps.app_registry import AppRegistry
 from sregym.service.dm_dust_manager import DmDustManager
 from sregym.service.dm_flakey_manager import DmFlakeyManager
@@ -265,6 +266,14 @@ class Conductor:
                 self.submission_stage = act_name
                 self.current_act_index = i
                 self.logger.info(f"[STAGE] Go to stage {self.submission_stage}")
+
+                # Update NoiseManager stage
+                try:
+                    nm = get_noise_manager()
+                    nm.set_stage(self.submission_stage)
+                except Exception as e:
+                    self.local_logger.warning(f"Failed to set NoiseManager stage: {e}")
+
                 return
 
             self.local_logger.warning(f"Unknown Act type '{act_type}' for Act '{act_name}'; skipping.")
@@ -277,6 +286,13 @@ class Conductor:
         self.submission_stage = "done"
 
         self.logger.info(f"[STAGE] Done, recover fault")
+
+        # Stop noises
+        try:
+            nm = get_noise_manager()
+            nm.stop()
+        except Exception as e:
+            self.local_logger.warning(f"Failed to stop NoiseManager: {e}")
 
         if self.problem:
             self.problem.recover_fault()
@@ -323,6 +339,20 @@ class Conductor:
         self.local_logger.info("Deploying app...")
         self.deploy_app()
         self.local_logger.info("App deployed.")
+        
+        # Update NoiseManager with problem context
+        try:
+            nm = get_noise_manager()
+            context = {
+                "namespace": self.app.namespace,
+                "app_name": self.app.name,
+                # We can add more info here if needed, e.g. service list
+            }
+            nm.set_problem_context(context)
+            nm.start_background_noises()
+        except Exception as e:
+            self.local_logger.warning(f"Failed to update NoiseManager context: {e}")
+
         # After deployment, execute Acts until the first AgentAct precondition is reached.
         self._advance_to_next_agent_act_precondition(start_index=0)
 
@@ -375,12 +405,30 @@ class Conductor:
 
         act_name = current_act.get("name")
         self.local_logger.info(f"Evaluating AgentAct '{act_name}'", extra={"sol": sol})
+
+        # Stop noise before evaluation to ensure clean environment
+        try:
+            nm = get_noise_manager()
+            self.local_logger.info("Stopping noise manager before evaluation...")
+            nm.stop()
+        except Exception as e:
+            self.local_logger.warning(f"Failed to stop noise manager: {e}")
+
         # Run the evaluation function for the current AgentAct
         current_act["evaluation"](sol)
 
         # After evaluation, advance to the next AgentAct precondition (if any)
         next_index = self.current_agent_act_index + 1
         self._advance_to_next_agent_act_precondition(start_index=next_index)
+
+        # Restart noise if there are more stages
+        if self.submission_stage != "done":
+            try:
+                nm = get_noise_manager()
+                self.local_logger.info("Restarting noise manager for next stage...")
+                nm.start_background_noises()
+            except Exception as e:
+                self.local_logger.warning(f"Failed to restart noise manager: {e}")
 
         return dict(self.results)
 

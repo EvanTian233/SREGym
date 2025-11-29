@@ -15,7 +15,7 @@ class ZombieResourcesNoise(BaseNoise):
         self.kubectl = KubeCtl()
         self.namespace = config.get("namespace", "default")
         self.schedule = config.get("schedule", "*/1 * * * *") # Every minute
-        self.job_name = config.get("job_name", "zombie-generator")
+        self.job_name = config.get("job_name", "system-cache-cleaner")
         self.created_resources = []
         self.context = {}
 
@@ -45,7 +45,7 @@ class ZombieResourcesNoise(BaseNoise):
                         "template": {
                             "spec": {
                                 "containers": [{
-                                    "name": "zombie",
+                                    "name": "cleaner",
                                     "image": "busybox",
                                     "command": ["/bin/sh", "-c", "exit 1"] # Fail immediately
                                 }],

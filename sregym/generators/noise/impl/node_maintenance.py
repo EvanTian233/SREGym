@@ -13,8 +13,8 @@ class NodeMaintenanceNoise(BaseNoise):
     def __init__(self, config):
         super().__init__(config)
         self.kubectl = KubeCtl()
-        self.interval = config.get("interval", 300) # Maintenance every 5 mins
-        self.duration = config.get("duration", 60) # Maintenance lasts 60s
+        self.interval = config.get("interval", 240) # Maintenance every 4 mins
+        self.duration = config.get("duration", 120) # Maintenance lasts 120s
         self.last_maintenance_time = 0
         self.maintenance_lock = threading.Lock()
         self.active_maintenance = None # Stores (node_name, start_time)
@@ -49,6 +49,10 @@ class NodeMaintenanceNoise(BaseNoise):
             # Get list of nodes
             nodes_json = self.kubectl.exec_command("kubectl get nodes -o jsonpath='{.items[*].metadata.name}'")
             nodes = nodes_json.split()
+
+            if len(nodes) < 2:
+                logger.warning("Skipping node maintenance: Cluster has less than 2 nodes. Draining the only node would cause total outage.")
+                return
             
             # Filter out control-plane if possible (simple heuristic)
             worker_nodes = [n for n in nodes if "control-plane" not in n and "master" not in n]

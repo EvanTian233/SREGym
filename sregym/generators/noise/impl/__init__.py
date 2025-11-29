@@ -18,5 +18,8 @@ from . import chaos_mesh
 from . import kubectl_noise
 from . import ghost_metrics
 from . import jaeger_noise
+from . import zombie_resources
+from . import cicd_noise
+from . import node_maintenance
 
 
