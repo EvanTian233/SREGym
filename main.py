@@ -24,6 +24,7 @@ from sregym.conductor.conductor_api import request_shutdown, run_api
 from sregym.conductor.constants import StartProblemResult
 
 LAUNCHER = AgentLauncher()
+logger = logging.getLogger(__name__)
 
 
 def get_current_datetime_formatted():
@@ -107,7 +108,7 @@ def driver_loop(conductor: Conductor, problem_filter: str = None, use_external_h
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()
                     writer.writerows(all_results_for_agent)
-                print(f"✅ Problem {pid} for agent {agent_name} complete! Results written to {csv_path}")
+                logger.info(f"✅ Problem {pid} for agent {agent_name} complete! Results written to {csv_path}")
             entry_for_agent = {agent_name: all_results_for_agent}
             all_results.append(entry_for_agent)
 
@@ -189,7 +190,7 @@ def start_dashboard_process():
         # Give dashboard a moment to start up
         time.sleep(2)
     except Exception as e:
-        print(f"⚠️  Failed to start dashboard server: {e}", file=sys.stderr)
+        logger.warning(f"⚠️  Failed to start dashboard server: {e}")
 
     return dashboard_process
 
@@ -225,9 +226,9 @@ def main():
 
             nm = get_noise_manager()
             nm.load_config(args.noise_config)
-            print(f"✅ Noise manager initialized with config: {args.noise_config}")
+            logger.info(f"✅ Noise manager initialized with config: {args.noise_config}")
         except Exception as e:
-            print(f"⚠️ Failed to initialize noise manager: {e}")
+            logger.warning(f"⚠️ Failed to initialize noise manager: {e}")
 
     # Start dashboard in a separate process
     dashboard_process = None
@@ -264,10 +265,10 @@ def main():
         # Stop noise manager if it was initialized
         if nm:
             try:
-                print("Stopping noise manager...")
+                logger.info("Stopping noise manager...")
                 nm.stop()
             except Exception as e:
-                print(f"⚠️ Error stopping noise manager: {e}")
+                logger.error(f"⚠️ Error stopping noise manager: {e}")
 
         # Give driver a moment to finish setting results
         driver_thread.join(timeout=5)
@@ -281,11 +282,11 @@ def main():
                 dashboard_process.join(timeout=5)
                 # Force kill only if still alive after graceful shutdown timeout
                 if dashboard_process.is_alive():
-                    print("⚠️  Dashboard process did not exit gracefully, forcing termination...", file=sys.stderr)
+                    logger.warning("⚠️  Dashboard process did not exit gracefully, forcing termination...")
                     dashboard_process.kill()
                     dashboard_process.join(timeout=1)
             except Exception as e:
-                print(f"⚠️  Error terminating dashboard process: {e}", file=sys.stderr)
+                logger.error(f"⚠️  Error terminating dashboard process: {e}")
 
     # When API shuts down, collect results from driver
     results = getattr(main, "results", [])
@@ -304,9 +305,9 @@ def main():
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(agent_results)
-            print(f"✅ Benchmark complete! Results for {agent_name} written to {csv_path}")
+            logger.info(f"✅ Benchmark complete! Results for {agent_name} written to {csv_path}")
     else:
-        print("⚠️ No results to write.")
+        logger.warning("⚠️ No results to write.")
 
     sys.exit(0)
 
