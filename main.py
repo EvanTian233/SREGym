@@ -218,15 +218,22 @@ def main():
     # set up the logger
     init_logger()
 
-    # Initialize Noise Manager if config is provided
+    # Initialize Noise Manager if config is provided or default config exists
     nm = None
-    if args.noise_config:
+    noise_config_path = args.noise_config
+    default_noise_config = "sregym/generators/noise/noise_config.yaml"
+
+    # Use default path if no argument provided but default file exists
+    if not noise_config_path and os.path.exists(default_noise_config):
+        noise_config_path = default_noise_config
+
+    if noise_config_path:
         try:
             from sregym.generators.noise.manager import get_noise_manager
 
             nm = get_noise_manager()
-            nm.load_config(args.noise_config)
-            logger.info(f"✅ Noise manager initialized with config: {args.noise_config}")
+            nm.load_config(noise_config_path)
+            logger.info(f"✅ Noise manager initialized with config: {noise_config_path}")
         except Exception as e:
             logger.warning(f"⚠️ Failed to initialize noise manager: {e}")
 

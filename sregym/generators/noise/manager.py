@@ -2,12 +2,15 @@ import logging
 import threading
 import time
 from typing import Any, Dict, List, Optional
+
 import yaml
 
 from sregym.generators.noise.base import BaseNoise
+
 # We will import implementations dynamically or register them
 
 logger = logging.getLogger(__name__)
+
 
 class NoiseManager:
     _instance = None
@@ -38,28 +41,28 @@ class NoiseManager:
         logger.info(f"NoiseManager context updated: {context.keys()}")
         # Update context for all existing noises
         for noise in self.noises:
-            if hasattr(noise, 'set_context'):
+            if hasattr(noise, "set_context"):
                 noise.set_context(context)
 
-    def load_config(self, config_path: str):
+    def load_config(self, config_path: Optional[str] = None):
         logger.info(f"Loading noise configuration from {config_path}")
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
-        
+
         self.noises = []
-        noise_configs = self.config.get('noises', [])
-        
+        noise_configs = self.config.get("noises", [])
+
         from sregym.generators.noise.impl import get_noise_class
-        
+
         for nc in noise_configs:
-            if not nc.get('enabled', True):
+            if not nc.get("enabled", True):
                 continue
-            
-            noise_type = nc.get('type')
+
+            noise_type = nc.get("type")
             noise_class = get_noise_class(noise_type)
             if noise_class:
                 try:
-                    noise_instance = noise_class(nc.get('config', {}))
+                    noise_instance = noise_class(nc.get("config", {}))
                     self.noises.append(noise_instance)
                     logger.info(f"Initialized noise: {noise_type}")
                 except Exception as e:
@@ -75,17 +78,19 @@ class NoiseManager:
         for noise in self.noises:
             if not noise.is_active(self.current_stage):
                 continue
-                
+
             # Check if this noise is configured to react to this tool/command
             # This logic depends on how we define the config for temporal injection
             # For now, we pass the context to the noise and let it decide
             try:
-                noise.inject(context={
-                    "trigger": "tool_call",
-                    "tool_name": tool_name,
-                    "command": command,
-                    "session_id": session_id
-                })
+                noise.inject(
+                    context={
+                        "trigger": "tool_call",
+                        "tool_name": tool_name,
+                        "command": command,
+                        "session_id": session_id,
+                    }
+                )
             except Exception as e:
                 logger.error(f"Error injecting noise {noise}: {e}")
 
@@ -98,12 +103,15 @@ class NoiseManager:
                 continue
 
             try:
-                result = noise.modify_result(context={
-                    "trigger": "tool_result",
-                    "tool_name": tool_name,
-                    "command": command,
-                    "session_id": session_id
-                }, result=result)
+                result = noise.modify_result(
+                    context={
+                        "trigger": "tool_result",
+                        "tool_name": tool_name,
+                        "command": command,
+                        "session_id": session_id,
+                    },
+                    result=result,
+                )
             except Exception as e:
                 logger.error(f"Error modifying result in noise {noise}: {e}")
         return result
@@ -123,7 +131,7 @@ class NoiseManager:
         self.running = False
         if self._background_thread:
             self._background_thread.join(timeout=2)
-        
+
         # Clean up all noises
         for noise in self.noises:
             try:
@@ -141,7 +149,8 @@ class NoiseManager:
                     noise.inject(context={"trigger": "background"})
                 except Exception as e:
                     logger.error(f"Error in background noise injection {noise}: {e}")
-            time.sleep(1) # Check every second, noises handle their own scheduling
+            time.sleep(1)  # Check every second, noises handle their own scheduling
+
 
 # Global accessor
 def get_noise_manager() -> NoiseManager:
