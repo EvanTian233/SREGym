@@ -40,6 +40,7 @@ class MitigationAgent(BaseAgent):
         self.graph_builder.add_node(self.post_round_process_node, self.post_round_process)
         self.graph_builder.add_node(self.force_submit_prompt_inject_node, self.llm_force_submit_thinking_step)
         self.graph_builder.add_node(self.force_submit_tool_call_node, self.llm_force_submit_tool_call_step)
+        self.graph_builder.add_node(self.force_submit_tool_execute_node, self.llm_force_submit_tool_execute_node)
 
         self.graph_builder.add_edge(START, self.thinking_prompt_inject_node)
         self.graph_builder.add_edge(self.thinking_prompt_inject_node, self.thinking_node)
@@ -57,7 +58,8 @@ class MitigationAgent(BaseAgent):
         )
         # TODO: Before submitting, run oracle to see if really mitigated.
         self.graph_builder.add_edge(self.force_submit_prompt_inject_node, self.force_submit_tool_call_node)
-        self.graph_builder.add_edge(self.force_submit_tool_call_node, END)
+        self.graph_builder.add_edge(self.force_submit_tool_call_node, self.force_submit_tool_execute_node)
+        self.graph_builder.add_edge(self.force_submit_tool_execute_node, END)
         self.graph_builder.add_edge(self.post_round_process_node, END)
 
         self.memory_saver = MemorySaver()
