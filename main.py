@@ -163,6 +163,25 @@ def main(args):
     # set up the logger
     init_logger()
 
+    # Initialize Noise Manager if config is provided or default config exists
+    nm = None
+    noise_config_path = args.noise_config
+    default_noise_config = "sregym/generators/noise/noise_config.yaml"
+
+    # Use default path if no argument provided but default file exists
+    if not noise_config_path and os.path.exists(default_noise_config):
+        noise_config_path = default_noise_config
+
+    if noise_config_path:
+        try:
+            from sregym.generators.noise.manager import get_noise_manager
+
+            nm = get_noise_manager()
+            nm.load_config(noise_config_path)
+            logger.info(f"✅ Noise manager initialized with config: {noise_config_path}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to initialize noise manager: {e}")
+
     os.environ["MODEL_ID"] = args.model
 
     conductor = Conductor()
@@ -255,6 +274,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--use-external-harness", action="store_true", help="For use in external harnesses, deploy the fault and exit."
+    )
+    parser.add_argument(
+        "--noise-config",
+        type=str,
+        default=None,
+        help="Path to noise configuration YAML file",
     )
     args = parser.parse_args()
 
