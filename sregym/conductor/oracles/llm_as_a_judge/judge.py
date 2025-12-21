@@ -33,11 +33,23 @@ class LLMJudge:
         temperature: float = 0.0,
         max_tokens: int = 4096,
     ):
+        # Store parameters for lazy initialization
+        self.provider = provider
+        self.model_name = model_name
+        self.url = url
+        self.api_key = api_key
+        self.temperature = temperature
+        self.max_tokens = max_tokens
 
-        # Initialize LiteLLM backend
-        self.backend = get_llm_backend_for_tools()
+        # Backend will be initialized lazily on first use
+        self._backend = None
 
-        print(f"Initialized LLMJudge")
+    @property
+    def backend(self):
+        """Lazily initialize the LLM backend only when needed."""
+        if self._backend is None:
+            self._backend = get_llm_backend_for_tools()
+        return self._backend
 
     def judge(self, solution: str, expectation: str) -> JudgmentResult:
         system_prompt = """You are an expert judge evaluating whether an agent's diagnosis of a system issue matches the expected root cause.
