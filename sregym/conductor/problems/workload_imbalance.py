@@ -12,13 +12,13 @@ from sregym.utils.decorators import mark_fault_injected
 class WorkloadImbalance(Problem):
     def __init__(self):
         self.app = AstronomyShop()
+        super().__init__(app=self.app, namespace=self.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = ["frontend"]
         self.injector = VirtualizationFaultInjector(namespace="kube-system")
         self.injector_for_scale = VirtualizationFaultInjector(namespace=self.namespace)
         self.root_cause = "The kube-proxy daemonset is using a buggy image version, and the frontend deployment is scaled to 5 replicas with a high workload surge, causing workload imbalance across pods."
-        super().__init__(app=self.app, namespace=self.namespace)
 
         # not so precise here by now
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)

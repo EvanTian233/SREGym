@@ -10,6 +10,7 @@ from sregym.utils.decorators import mark_fault_injected
 class IncorrectPortAssignment(Problem):
     def __init__(self):
         self.app = AstronomyShop()
+        super().__init__(app=self.app, namespace=self.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = "checkout"
@@ -18,7 +19,6 @@ class IncorrectPortAssignment(Problem):
         self.correct_port = "8080"
         self.injector = ApplicationFaultInjector(namespace=self.namespace)
         self.root_cause = f"The deployment `{self.faulty_service}` has the environment variable `{self.env_var}` configured with an incorrect port `{self.incorrect_port}` instead of `{self.correct_port}`."
-        super().__init__(app=self.app, namespace=self.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
         self.mitigation_oracle = IncorrectPortAssignmentMitigationOracle(problem=self)

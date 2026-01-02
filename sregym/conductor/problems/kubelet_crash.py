@@ -10,12 +10,12 @@ from sregym.utils.decorators import mark_fault_injected
 class KubeletCrash(Problem):
     def __init__(self):
         self.app = AstronomyShop()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.rollout_services = ["frontend", "frontend-proxy", "currency"]
         self.injector = RemoteOSFaultInjector()
 
-        super().__init__(app=self.app, namespace=self.app.namespace)
         self.root_cause = "The kubelet daemon on a node has crashed, preventing pod scheduling, updates, and management on that node, causing services to become unavailable or stuck."
 
         # note from JC after talking to Bohan:

@@ -11,12 +11,12 @@ from sregym.utils.decorators import mark_fault_injected
 class PaymentServiceUnreachable(Problem):
     def __init__(self):
         self.app = AstronomyShop()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.injector = OtelFaultInjector(namespace=self.namespace)
         self.faulty_service = "checkout"
         self.root_cause = f"The `{self.faulty_service}` service has a feature flag enabled that makes the payment service unreachable, causing checkout failures."
-        super().__init__(app=self.app, namespace=self.app.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
 

@@ -13,6 +13,7 @@ from sregym.utils.decorators import mark_fault_injected
 class PVCClaimMismatch(Problem):
     def __init__(self):
         self.app = HotelReservation()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.app.payload_script = (
@@ -28,7 +29,6 @@ class PVCClaimMismatch(Problem):
         ]
         self.injector = VirtualizationFaultInjector(namespace=self.namespace)
         self.root_cause = "Multiple MongoDB deployments are configured with PVC claim names that do not exist (claimName-broken), causing pods to remain in Pending state."
-        super().__init__(app=self.app, namespace=self.app.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
 

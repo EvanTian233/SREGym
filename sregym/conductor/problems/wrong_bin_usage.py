@@ -13,6 +13,7 @@ from sregym.utils.decorators import mark_fault_injected
 class WrongBinUsage(Problem):
     def __init__(self, faulty_service: str = "profile"):
         self.app = HotelReservation()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = faulty_service
@@ -21,7 +22,6 @@ class WrongBinUsage(Problem):
         self.app.payload_script = (
             TARGET_MICROSERVICES / "hotelReservation/wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua"
         )
-        super().__init__(app=self.app, namespace=self.app.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
 

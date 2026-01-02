@@ -12,11 +12,11 @@ from sregym.utils.decorators import mark_fault_injected
 class CapacityDecreaseRPCRetryStorm(Problem):
     def __init__(self):
         self.app = BlueprintHotelReservation()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = "rpc"
         self.root_cause = f"The ConfigMap `{self.faulty_service}` has misconfigured RPC timeout (50ms) and retry settings (30 retries), causing an RPC retry storm that overwhelms the service. It is a metastable failure."
-        super().__init__(app=self.app, namespace=self.app.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
 

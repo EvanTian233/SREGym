@@ -14,11 +14,11 @@ from sregym.utils.decorators import mark_fault_injected
 class AssignNonExistentNode(Problem):
     def __init__(self):
         self.app = SocialNetwork()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = "user-service"
         self.root_cause = f"The deployment `{self.faulty_service}` is configured with a nodeSelector pointing to a non-existent node (extra-node), causing pods to remain in Pending state."
-        super().__init__(app=self.app, namespace=self.app.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
 

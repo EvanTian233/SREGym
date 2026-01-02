@@ -37,6 +37,7 @@ class LatentSectorError(Problem):
         strategy: LatentSectorErrorStrategy = LatentSectorErrorStrategy.TARGETED,
     ):
         self.app = HotelReservation()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = namespace
         self.deploy = target_deploy
@@ -45,7 +46,6 @@ class LatentSectorError(Problem):
         self.pvc_path: Optional[str] = None
         self.strategy = strategy
 
-        super().__init__(app=self.app, namespace=self.app.namespace)
 
         self.root_cause = "There's a latent sector error on the hard drive that the mongodb-geo service's data is on."
 
