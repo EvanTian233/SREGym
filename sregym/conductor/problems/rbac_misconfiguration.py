@@ -16,11 +16,11 @@ class RBACMisconfiguration(Problem):
         else:
             raise ValueError(f"Unsupported app name: {app_name}")
 
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = faulty_service
 
-        super().__init__(app=self.app, namespace=self.app.namespace)
         self.root_cause = f"The deployment `{self.faulty_service}` uses a ServiceAccount with a ClusterRole that lacks ConfigMap permissions, but an init container tries to access a ConfigMap, causing the init container to fail and pods to remain in Init state."
 
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)

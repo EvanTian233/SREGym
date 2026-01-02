@@ -14,11 +14,11 @@ from sregym.utils.decorators import mark_fault_injected
 class PodAntiAffinityDeadlock(Problem):
     def __init__(self, faulty_service: str = "user-service"):
         self.app = SocialNetwork()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = faulty_service
         self.root_cause = f"The deployment `{self.faulty_service}` has strict pod anti-affinity rules (requiredDuringSchedulingIgnoredDuringExecution) that prevent multiple replicas from being scheduled on the same node, but with insufficient nodes, causing a scheduling deadlock where pods remain in Pending state."
-        super().__init__(app=self.app, namespace=self.app.namespace)
 
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)

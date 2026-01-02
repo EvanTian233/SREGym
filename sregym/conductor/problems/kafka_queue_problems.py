@@ -11,12 +11,12 @@ from sregym.utils.decorators import mark_fault_injected
 class KafkaQueueProblems(Problem):
     def __init__(self):
         self.app = AstronomyShop()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.injector = OtelFaultInjector(namespace=self.namespace)
         self.faulty_service = "kafka"
         self.root_cause = f"The `{self.faulty_service}` service has a feature flag enabled that causes queue problems, resulting in message processing failures."
-        super().__init__(app=self.app, namespace=self.app.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
 

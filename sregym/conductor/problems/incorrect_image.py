@@ -10,14 +10,14 @@ from sregym.utils.decorators import mark_fault_injected
 class IncorrectImage(Problem):
     def __init__(self):
         self.app = AstronomyShop()
-        self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
+        super().__init__(app=self.app, namespace=self.namespace)
+        self.kubectl = KubeCtl()
         self.faulty_service = ["product-catalog"]
         self.injector = ApplicationFaultInjector(namespace=self.namespace)
         self.root_cause = (
             "The 'product-catalog' deployment is mis-configured to pull the non-existent image 'app-image:latest'."
         )
-        super().__init__(app=self.app, namespace=self.namespace)
 
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
         self.mitigation_oracle = IncorrectImageMitigationOracle(

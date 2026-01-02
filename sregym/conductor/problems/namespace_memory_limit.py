@@ -10,12 +10,12 @@ from sregym.utils.decorators import mark_fault_injected
 class NamespaceMemoryLimit(Problem):
     def __init__(self):
         self.app = HotelReservation()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = "search"
         self.injector = VirtualizationFaultInjector(namespace=self.namespace)
         self.root_cause = f"The namespace has a ResourceQuota with a memory limit (1Gi) that is too restrictive, preventing the deployment `{self.faulty_service}` from scheduling new pods or causing existing pods to be evicted."
-        super().__init__(app=self.app, namespace=self.app.namespace)
 
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
         self.mitigation_oracle = NamespaceMemoryLimitMitigationOracle(problem=self)

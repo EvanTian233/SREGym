@@ -11,13 +11,13 @@ from sregym.utils.decorators import mark_fault_injected
 class LoadGeneratorFloodHomepage(Problem):
     def __init__(self):
         self.app = AstronomyShop()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.injector = OtelFaultInjector(namespace=self.namespace)
         self.faulty_service = "frontend"  # This fault technically gets injected into the load generator, but the loadgenerator just spams the frontend
         # We can discuss more and see if we think we should change it, but loadgenerator isn't a "real" service.
         self.root_cause = "The load generator has a feature flag enabled that causes it to flood the homepage with excessive requests, overwhelming the frontend service."
-        super().__init__(app=self.app, namespace=self.app.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
 

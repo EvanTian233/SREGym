@@ -21,9 +21,9 @@ class UpdateIncompatibleCorrelated(Problem):
             "mongodb-reservation",
             "mongodb-user",
         ]
+        super().__init__(app=self.app, namespace=self.namespace)
         self.root_cause = "The MongoDB deployments (mongodb-geo, mongodb-profile, mongodb-rate, and mongodb-recommendation) are updated to use an incompatible image version 'mongo:8.0.14-rc0'."
         self.injector = ApplicationFaultInjector(namespace=self.namespace)
-        super().__init__(app=self.app, namespace=self.namespace)
 
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
         # not really the incorrect image problem, just reuse the incorrect image function

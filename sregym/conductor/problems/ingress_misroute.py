@@ -11,13 +11,13 @@ from sregym.utils.decorators import mark_fault_injected
 class IngressMisroute(Problem):
     def __init__(self, path="/api", correct_service="frontend-service", wrong_service="recommendation-service"):
         self.app = HotelReservation()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.path = path
         self.correct_service = correct_service
         self.wrong_service = wrong_service
         self.ingress_name = "hotel-reservation-ingress"
         self.root_cause = f"The ingress `{self.ingress_name}` has a misconfigured routing rule for path `{self.path}`, routing traffic to the wrong service (`{self.wrong_service}` instead of `{self.correct_service}`)."
-        super().__init__(app=self.app, namespace=self.app.namespace)
         self.namespace = self.app.namespace
         self.networking_v1 = client.NetworkingV1Api()
         self.faulty_service = [correct_service, wrong_service]

@@ -81,6 +81,7 @@ class KhaosFaultProblem(Problem):
         inject_args: Optional[List[int | str]] = None,
     ):
         self.app = HotelReservation()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = self.app.kubectl if hasattr(self.app, "kubectl") else None
         self.namespace = self.app.namespace
         self.injector = HWFaultInjector()
@@ -100,7 +101,6 @@ class KhaosFaultProblem(Problem):
             TARGET_MICROSERVICES / "hotelReservation/wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua"
         )
 
-        super().__init__(app=self.app, namespace=self.app.namespace)
 
         self.root_cause = cfg.description
 

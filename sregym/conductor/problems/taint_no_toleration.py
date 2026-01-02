@@ -12,13 +12,13 @@ class TaintNoToleration(Problem):
         self.app = SocialNetwork()
         self.namespace = self.app.namespace
         self.kubectl = KubeCtl()
+        super().__init__(app=self.app, namespace=self.namespace)
 
         # ── pick all real worker nodes dynamically ───────────────────────
         self.faulty_nodes = self._pick_worker_nodes()
         self.faulty_service = "user-service"
         self.root_cause = f"Worker nodes are tainted with sre-fault=blocked:NoSchedule, but the deployment `{self.faulty_service}` has a toleration for a different key (dummy-key), causing pods to be unschedulable and remain in Pending state."
 
-        super().__init__(app=self.app, namespace=self.namespace)
 
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
         # TODO: support more precise diagnosis oracle: Nodes or DeploymentConfiguration

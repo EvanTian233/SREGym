@@ -11,12 +11,12 @@ from sregym.utils.decorators import mark_fault_injected
 class CartServiceFailure(Problem):
     def __init__(self):
         self.app = AstronomyShop()
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.injector = OtelFaultInjector(namespace=self.namespace)
         self.faulty_service = "cart"
         self.root_cause = f"The `{self.faulty_service}` service has a feature flag enabled that causes it to fail, resulting in service unavailability."
-        super().__init__(app=self.app, namespace=self.app.namespace)
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
 

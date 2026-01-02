@@ -12,11 +12,11 @@ class PersistentVolumeAffinityViolation(Problem):
     def __init__(self, app_name: str = "Social Network", faulty_service: str = "user-service"):
         self.apps = AppRegistry()
         self.app = self.apps.get_app_instance(app_name)
+        super().__init__(app=self.app, namespace=self.app.namespace)
         self.kubectl = KubeCtl()
         self.namespace = self.app.namespace
         self.faulty_service = faulty_service
         self.root_cause = f"The deployment `{self.faulty_service}` is configured with a PersistentVolume (temp-pv) that has node affinity to node A, but the deployment has a nodeSelector pointing to node B, causing a volume affinity violation and pods to remain in Pending state."
-        super().__init__(app=self.app, namespace=self.app.namespace)
 
         # === Attach evaluation oracles ===
         self.diagnosis_oracle = LLMAsAJudgeOracle(problem=self, expected=self.root_cause)
