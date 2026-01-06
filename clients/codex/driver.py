@@ -133,6 +133,8 @@ Problem ID: {problem_id}
 
 {descriptions}
 
+CRITICAL: You are running in an AUTOMATED environment. Work autonomously and make all decisions yourself. DO NOT ask for user confirmation or approval. Proceed with the best solution based on your analysis.
+
 WORKFLOW: You will perform TWO tasks in sequence:
 
 TASK 1: DIAGNOSIS
@@ -142,8 +144,9 @@ TASK 1: DIAGNOSIS
 
 TASK 2: MITIGATION
 - Identify the root cause of the issue
-- Implement a fix to resolve the problem
-- When the fix is applied, submit to trigger validation
+- Implement a fix to resolve the problem autonomously (do not ask for confirmation)
+- After applying the fix, YOU MUST submit with an empty string to trigger validation
+- The submission is REQUIRED - do not exit without submitting
 
 HOW TO SUBMIT:
 
@@ -154,8 +157,9 @@ For DIAGNOSIS stage:
 - Example: POST {get_api_base_url()}/submit with JSON: {{"solution": "The frontend service is crashing due to missing environment variable"}}
 
 For MITIGATION stage:
-- Submit with an EMPTY STRING after you have applied the fix
+- After applying your fix, YOU MUST submit with an EMPTY STRING
 - POST {get_api_base_url()}/submit with JSON: {{"solution": ""}}
+- This submission is MANDATORY - the conductor needs it to validate your fix
 
 Important:
 - You have access to kubectl commands to inspect and modify resources in namespace '{namespace}'

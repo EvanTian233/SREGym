@@ -178,7 +178,6 @@ class CodexAgent:
 
         try:
             # Build Codex command
-            # Note: Using the same flags as Harbor for parity
             command = [
                 "codex",
                 "exec",
@@ -187,6 +186,10 @@ class CodexAgent:
                 "--model",
                 model,
                 "--json",
+                "--enable",
+                "unified_exec",
+                "-c",
+                "model_reasoning_effort=high",
                 "--",  # end of flags
                 instruction,
             ]

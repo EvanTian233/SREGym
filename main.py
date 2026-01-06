@@ -92,8 +92,15 @@ def driver_loop(
                 if reg:
                     await LAUNCHER.ensure_started(reg)
 
-            # Poll until grading completes
+            # Poll until grading completes or agent exits
             while conductor.submission_stage != "done":
+                # Check if agent process has exited
+                agent_proc = LAUNCHER._procs.get(agent_to_run)
+                if agent_proc:
+                    agent_proc.proc.poll()
+                    if agent_proc.proc.returncode is not None:
+                        console.log(f"⚠️  Agent process exited with return code {agent_proc.proc.returncode}")
+                        break
                 await asyncio.sleep(1)
 
             console.log(f"✅ Completed {pid}: results={conductor.results}")
@@ -115,6 +122,11 @@ def driver_loop(
                 writer.writeheader()
                 writer.writerows(all_results_for_agent)
             logger.info(f"✅ Problem {pid} for agent {agent_to_run} complete! Results written to {csv_path}")
+
+            # Cleanup agent process so a fresh one can be started for the next problem
+            if not use_external_harness:
+                LAUNCHER.cleanup_agent(agent_to_run)
+                console.log(f"🧹 Cleaned up agent process for {agent_to_run}")
 
         return [{agent_to_run: all_results_for_agent}]
 

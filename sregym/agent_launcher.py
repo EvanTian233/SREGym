@@ -23,12 +23,12 @@ class AgentLauncher:
         if not reg or not reg.kickoff_command:
             return None
         existing = self._procs.get(reg.name)
-        
+
         if existing:
             existing.proc.poll()
             if existing.proc.returncode is None:
                 return existing
-                
+
         env = os.environ.copy()
         if reg.kickoff_env:
             env.update(reg.kickoff_env)
@@ -59,3 +59,38 @@ class AgentLauncher:
                 sys.stdout.flush()
             except Exception:
                 break
+
+    def cleanup_agent(self, agent_name: str, timeout: int = 5) -> None:
+        """
+        Terminate and cleanup an agent process.
+
+        Args:
+            agent_name: Name of the agent to cleanup
+            timeout: Seconds to wait for graceful termination before killing
+        """
+        existing = self._procs.get(agent_name)
+        if not existing:
+            return
+
+        # Check if already terminated
+        existing.proc.poll()
+        if existing.proc.returncode is not None:
+            # Already terminated, just remove from cache
+            del self._procs[agent_name]
+            return
+
+        # Try graceful termination
+        try:
+            existing.proc.terminate()
+            try:
+                existing.proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # Force kill if timeout exceeded
+                existing.proc.kill()
+                existing.proc.wait()
+        except Exception:
+            pass
+        finally:
+            # Remove from cache
+            if agent_name in self._procs:
+                del self._procs[agent_name]
