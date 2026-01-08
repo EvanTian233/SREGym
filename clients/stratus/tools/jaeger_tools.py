@@ -217,7 +217,7 @@ get_dependency_graph_docstring = """
 
 @tool(description=get_dependency_graph_docstring)
 async def get_dependency_graph(
-    last_n_minutes: str,
+    last_n_minutes: int,
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
 
