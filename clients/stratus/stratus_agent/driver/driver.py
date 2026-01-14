@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -220,12 +221,11 @@ def get_benchmark_status():
     Check the current status of the benchmark.
     Returns the status string (e.g., "diagnosis", "mitigation", "done") or "error" on failure.
     """
-    ltc = LanggraphToolConfig()
     try:
-        # Construct the status URL from the submit URL
-        submit_url = ltc.submit_mcp_url
-        base_url = submit_url.rsplit("/", 1)[0]
-        status_url = f"{base_url}/status"
+        # Construct the status URL from the benchmark API (not the MCP URL)
+        # The status endpoint is at http://localhost:API_PORT/status
+        api_port = os.getenv("API_PORT", "8000")
+        status_url = f"http://localhost:{api_port}/status"
 
         response = requests.get(status_url, timeout=5)
         if response.status_code == 200:

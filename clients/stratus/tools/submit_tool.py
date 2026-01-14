@@ -1,5 +1,6 @@
 import ast
 import logging
+import os
 from contextlib import AsyncExitStack
 from typing import Annotated
 
@@ -37,11 +38,8 @@ def get_benchmark_status() -> str:
     Returns the status string (e.g., "diagnosis", "mitigation", "done") or "error" on failure.
     """
     try:
-        # Construct the status URL from the submit URL
-        # The submit URL is like http://host:port/submit, we need http://host:port/status
-        submit_url = langgraph_tool_config.submit_mcp_url
-        base_url = submit_url.rsplit("/", 1)[0]
-        status_url = f"{base_url}/status"
+        api_port = os.getenv("API_PORT", "8000")
+        status_url = f"http://localhost:{api_port}/status"
 
         response = requests.get(status_url, timeout=5)
         if response.status_code == 200:
