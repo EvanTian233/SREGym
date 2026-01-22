@@ -108,7 +108,7 @@ class Conductor:
             self.tasklist = ["diagnosis", "mitigation"]
             return
 
-        with open(tasklist_path, "r") as f:
+        with open(tasklist_path) as f:
             tasklist = yaml.safe_load(f)
             if not tasklist:
                 msg = "Badly formatted tasklist.yml"
@@ -431,6 +431,13 @@ class Conductor:
         self.logger.info("[FIX] KubeletCrash leftover if any")
         injector = RemoteOSFaultInjector()
         injector.recover_kubelet_crash()
+
+        self.logger.info("[FIX] Stale CoreDNS config leftover if any")
+        injector = VirtualizationFaultInjector(namespace="kube-system")
+        try:
+            injector.recover_stale_coredns_config()
+        except Exception as e:
+            self.logger.error(f"Failed to recover stale CoreDNS config: {e}")
         self.logger.info("Fix Kubernetes completed.")
 
     def deploy_app(self):
