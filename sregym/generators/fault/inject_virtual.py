@@ -659,6 +659,67 @@ class VirtualizationFaultInjector(FaultInjector):
 
         print("Recovered from stale CoreDNS config for all .svc.cluster.local domains")
 
+    def recover_all_nxdomain_templates(self):
+        """
+        Remove ALL NXDOMAIN template blocks from CoreDNS config.
+        This handles both:
+        - stale_coredns_config: `template ANY ANY svc.cluster.local`
+        - service_dns_resolution_failure: `template ANY ANY {service}.{namespace}.svc.cluster.local`
+        """
+        import re
+
+        cm_yaml = self.kubectl.exec_command("kubectl -n kube-system get cm coredns -o yaml")
+        cm_data = yaml.safe_load(cm_yaml)
+        corefile = cm_data["data"]["Corefile"]
+
+        # Pattern to match any NXDOMAIN template block
+        # Matches: template ANY ANY <anything> { ... rcode NXDOMAIN ... }
+        nxdomain_pattern = re.compile(
+            r"^\s*template\s+ANY\s+ANY\s+[^\n]+\{[^}]*rcode\s+NXDOMAIN[^}]*\}\s*\n?",
+            re.MULTILINE | re.DOTALL,
+        )
+
+        if not nxdomain_pattern.search(corefile):
+            print("No NXDOMAIN templates found in CoreDNS config; nothing to do")
+            return
+
+        new_corefile = nxdomain_pattern.sub("", corefile)
+
+        # Remove any resulting double blank lines
+        new_corefile = re.sub(r"\n{3,}", "\n\n", new_corefile)
+
+        cm_data["data"]["Corefile"] = new_corefile
+
+        def _exec_or_raise(command: str, action: str):
+            result = self.kubectl.exec_command(command)
+            if result and "error" in result.lower():
+                msg = f"{action} failed: {result.strip()}"
+                print(msg)
+                raise RuntimeError(msg)
+            return result
+
+        # Apply using temporary file
+        tmp_file_path = self._write_yaml_to_file("coredns", cm_data)
+        _exec_or_raise(f"kubectl apply -f {tmp_file_path}", "Applying CoreDNS configmap")
+
+        # Restart CoreDNS
+        _exec_or_raise("kubectl -n kube-system rollout restart deployment coredns", "Restarting CoreDNS")
+        _exec_or_raise(
+            "kubectl -n kube-system rollout status deployment coredns --timeout=30s",
+            "Waiting for CoreDNS rollout",
+        )
+
+        # Verify all NXDOMAIN templates are gone
+        cm_yaml_after = self.kubectl.exec_command("kubectl -n kube-system get cm coredns -o yaml")
+        cm_data_after = yaml.safe_load(cm_yaml_after)
+        corefile_after = cm_data_after["data"]["Corefile"]
+        if nxdomain_pattern.search(corefile_after):
+            msg = "CoreDNS config still contains NXDOMAIN templates after recovery"
+            print(msg)
+            raise RuntimeError(msg)
+
+        print("Recovered all NXDOMAIN templates from CoreDNS config")
+
     # V.13 - Inject a sidecar container that binds to the same port as the main container (port conflict)
     def inject_sidecar_port_conflict(self, microservices: list[str]):
         for service in microservices:
