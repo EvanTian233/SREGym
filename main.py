@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import csv
 import logging
-import multiprocessing
 import os
 import sys
 import threading
@@ -24,6 +23,7 @@ from sregym.conductor.constants import StartProblemResult
 
 LAUNCHER = AgentLauncher()
 logger = logging.getLogger(__name__)
+_driver_results: list[dict] = []
 
 
 def get_current_datetime_formatted():
@@ -33,7 +33,10 @@ def get_current_datetime_formatted():
 
 
 def driver_loop(
-    conductor: Conductor, problem_filter: str = None, agent_to_run: str = None, use_external_harness: bool = False
+    conductor: Conductor,
+    problem_filter: str | None = None,
+    agent_to_run: str | None = None,
+    use_external_harness: bool = False,
 ):
     """
     Deploy each problem and wait for HTTP grading via POST /submit.
@@ -102,6 +105,9 @@ def driver_loop(
                 console.log(f"✅ Fault injected for problem '{pid}'. Exiting for external harness.")
                 return []
 
+            # If no external harness, agent is required
+            assert agent_to_run is not None
+
             if not use_external_harness:
                 reg = get_agent(agent_to_run, path=Path(os.path.dirname(os.path.abspath(__file__))) / "agents.yaml")
                 if reg:
@@ -125,7 +131,7 @@ def driver_loop(
             if not use_external_harness:
                 agent_proc = LAUNCHER._procs.get(agent_to_run)
                 if agent_proc:
-                    console.log(f"⏳ Waiting for agent process to complete...")
+                    console.log("⏳ Waiting for agent process to complete...")
                     timeout = 30  # seconds
                     elapsed = 0
                     while elapsed < timeout:
@@ -147,7 +153,7 @@ def driver_loop(
                     snapshot[stage] = outcome
             all_results_for_agent.append(snapshot)
 
-            fieldnames = sorted({key for row in all_results_for_agent for key in row.keys()})
+            fieldnames = sorted({key for row in all_results_for_agent for key in row})
             current_date_time = get_current_datetime_formatted()
             csv_path = f"{current_date_time}_{pid}_{agent_to_run}_results.csv"
             with open(csv_path, "w", newline="") as csvfile:
@@ -185,7 +191,7 @@ def start_mcp_server_after_api():
         log_level="info",
     )
     # IMPORTANT: we're not in the main thread
-    config.install_signal_handlers = False
+    config.install_signal_handlers = False  # type: ignore[attr-defined]
 
     server = uvicorn.Server(config)
     # This call blocks *this* thread; it's fine because we're daemonizing the thread
@@ -193,13 +199,17 @@ def start_mcp_server_after_api():
 
 
 def _run_driver_and_shutdown(
-    conductor: Conductor, problem_filter: str = None, agent_to_run: str = None, use_external_harness: bool = False
+    conductor: Conductor,
+    problem_filter: str | None = None,
+    agent_to_run: str | None = None,
+    use_external_harness: bool = False,
 ):
     """Run the benchmark driver, stash results, then tell the API to exit."""
     results = driver_loop(
         conductor, problem_filter=problem_filter, agent_to_run=agent_to_run, use_external_harness=use_external_harness
     )
-    setattr(main, "results", results)
+    global _driver_results
+    _driver_results = results
     # ⬇️ Ask the API server (running in main thread) to stop so we can write CSV
     request_shutdown()
 
@@ -229,7 +239,7 @@ def main(args):
 
     os.environ["MODEL_ID"] = args.model
 
-    conductor = Conductor()
+    conductor = Conductor(skip_loki=args.use_external_harness)
 
     # Start the driver in the background; it will call request_shutdown() when finished
     driver_thread = threading.Thread(
@@ -268,7 +278,7 @@ def main(args):
         driver_thread.join(timeout=5)
 
     # When API shuts down, collect results from driver
-    results = getattr(main, "results", [])
+    results = _driver_results
 
     if results:
         aggregated = {}
@@ -277,7 +287,7 @@ def main(args):
                 aggregated.setdefault(agent_name, []).extend(agent_rows)
 
         for agent_name, agent_results in aggregated.items():
-            fieldnames = sorted({key for row in agent_results for key in row.keys()})
+            fieldnames = sorted({key for row in agent_results for key in row})
             current_date_time = get_current_datetime_formatted()
             csv_path = f"{current_date_time}_{agent_name}_ALL_results.csv"
             with open(csv_path, "w", newline="") as csvfile:

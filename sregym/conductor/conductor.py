@@ -25,12 +25,13 @@ from sregym.service.telemetry.prometheus import Prometheus
 
 
 class Conductor:
-    def __init__(self):
+    def __init__(self, skip_loki: bool = False):
         # core services
         self.problems = ProblemRegistry()
         self.kubectl = KubeCtl()
         self.prometheus = Prometheus()
         self.loki = Loki()
+        self.skip_loki = skip_loki
         self.apps = AppRegistry()
         self.agent_name = None
 
@@ -53,7 +54,7 @@ class Conductor:
         self.problem = None
         self.app = None
         self.detection_oracle = None
-        self.execution_start_time = None
+        self.execution_start_time: float = 0.0
 
         # grading flow state
         # submission_stage reflects the current stage (e.g., "diagnosis", "mitigation") or "done"
@@ -67,6 +68,12 @@ class Conductor:
         self.current_stage_index: int = 0
         self.waiting_for_agent: bool = False
         self.fault_injected: bool = False
+
+    def _require_problem(self):
+        """Return the current problem, raising if none is loaded."""
+        if self.problem is None:
+            raise RuntimeError("No problem is loaded")
+        return self.problem
 
     def register_agent(self, name="agent"):
         self.agent_name = name
@@ -190,23 +197,26 @@ class Conductor:
 
     def _inject_fault(self):
         """Inject fault and prepare diagnosis checkpoint if available."""
-        self.problem.inject_fault()
+        problem = self._require_problem()
+        problem.inject_fault()
         self.logger.info("[ENV] Injected fault")
         self.fault_injected = True
 
         # Prepare diagnosis checkpoint if available, after fault injection but before agent stages
         if (
-            hasattr(self.problem, "diagnosis_oracle")
-            and self.problem.diagnosis_oracle
-            and isinstance(self.problem.diagnosis_oracle, DiagnosisOracle)
+            hasattr(problem, "diagnosis_oracle")
+            and problem.diagnosis_oracle
+            and isinstance(problem.diagnosis_oracle, DiagnosisOracle)
         ):
-            self.problem.diagnosis_oracle.load_diagnosis_checkpoint()
+            problem.diagnosis_oracle.load_diagnosis_checkpoint()
             self.logger.info("Diagnosis checkpoint loaded after fault injection.")
 
     def _evaluate_diagnosis(self, solution):
         """Evaluation logic for diagnosis stage."""
+        problem = self._require_problem()
+
         self.logger.info("Start Eval for Diagnosis", extra={"sol": solution})
-        r = self.problem.diagnosis_oracle.evaluate(solution)
+        r = problem.diagnosis_oracle.evaluate(solution)
         self.results["Diagnosis"] = r
         self.results["TTL"] = time.time() - self.execution_start_time
         self.logger.info(
@@ -218,9 +228,10 @@ class Conductor:
 
     def _evaluate_mitigation(self, solution):
         """Evaluation logic for mitigation stage."""
+        problem = self._require_problem()
         # Currently mitigation_oracle.evaluate() does not take the agent solution directly.
         self.logger.info("Start Eval for Mitigation", extra={"sol": solution})
-        r = self.problem.mitigation_oracle.evaluate()
+        r = problem.mitigation_oracle.evaluate()
         self.results["Mitigation"] = r
         self.results["TTM"] = time.time() - self.execution_start_time
         self.logger.info(
@@ -250,7 +261,7 @@ class Conductor:
 
         if start_index < len(self.stage_sequence):
             stage = self.stage_sequence[start_index]
-            stage_name = stage.get("name")
+            stage_name: str = stage["name"]
 
             self.logger.debug(f"Advancing to stage '{stage_name}' and waiting for agent.")
             self.waiting_for_agent = True
@@ -260,7 +271,7 @@ class Conductor:
             # Update NoiseManager stage
             try:
                 nm = get_noise_manager()
-                nm.set_stage(self.submission_stage)
+                nm.set_stage(stage_name)
             except Exception as e:
                 self.logger.warning(f"Failed to set NoiseManager stage: {e}")
         else:
@@ -305,6 +316,8 @@ class Conductor:
         Returns:
             StartProblemResult: Result status indicating success or skip reason
         """
+        if self.problem_id is None:
+            raise RuntimeError("Cannot start problem: problem_id is not set")
         self.execution_start_time = time.time()
         self.problem = self.problems.get_problem_instance(self.problem_id)
         self.app = self.problem.app
@@ -444,6 +457,7 @@ class Conductor:
 
     def deploy_app(self):
         """Kubectl + Prometheus + problem.app deployment."""
+        problem = self._require_problem()
         self.submission_stage = "setup"
         self.logger.info("[DEPLOY] Setting up metrics-server…")
         self.kubectl.exec_command(
@@ -460,7 +474,7 @@ class Conductor:
         self.kubectl.wait_for_ready("kube-system")
 
         # Only deploy Khaos if the problem requires it
-        if self.problem and self.problem.requires_khaos():
+        if problem.requires_khaos():
             self.logger.info("[DEPLOY] Deploying Khaos DaemonSet...")
             self.khaos.ensure_deployed()
 
@@ -490,12 +504,15 @@ class Conductor:
         self.logger.info("[DEPLOY] Deploying Prometheus…")
         self.prometheus.deploy()
 
-        self.logger.info("[DEPLOY] Deploying Loki…")
-        self.loki.deploy()
+        if not self.skip_loki:
+            self.logger.info("[DEPLOY] Deploying Loki…")
+            self.loki.deploy()
+        else:
+            self.logger.info("[DEPLOY] Skipping Loki deployment (external harness mode)")
 
         # Set up fault injection infrastructure based on problem type
         # Only one can be active at /var/openebs/local at a time
-        problem_name = self.problem.__class__.__name__
+        problem_name = problem.__class__.__name__
 
         if "LatentSectorError" in problem_name:
             print("Setting up dm-dust infrastructure for LSE fault injection...")
@@ -514,10 +531,10 @@ class Conductor:
             self._baseline_captured = True
 
         self.logger.info("[DEPLOY] Deploying and starting workload")
-        self.problem.app.deploy()
-        self.logger.info(f"[ENV] Deploy application: {self.problem.app.name}")
+        problem.app.deploy()
+        self.logger.info(f"[ENV] Deploy application: {problem.app.name}")
 
-        self.problem.app.start_workload()
+        problem.app.start_workload()
         self.logger.info("[ENV] Start workload")
 
     def undeploy_app(self):
