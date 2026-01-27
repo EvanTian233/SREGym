@@ -17,12 +17,13 @@ from mcp_server.configs.load_all_cfg import mcp_server_cfg
 from mcp_server.sregym_mcp_server import app as mcp_app
 from sregym.agent_launcher import AgentLauncher
 from sregym.agent_registry import get_agent, list_agents
-from sregym.conductor.conductor import Conductor
+from sregym.conductor.conductor import Conductor, ConductorConfig
 from sregym.conductor.conductor_api import request_shutdown, run_api
 from sregym.conductor.constants import StartProblemResult
 
 LAUNCHER = AgentLauncher()
 logger = logging.getLogger(__name__)
+_driver_results: list[dict] = []
 
 
 def get_current_datetime_formatted():
@@ -33,10 +34,10 @@ def get_current_datetime_formatted():
 
 def driver_loop(
     conductor: Conductor,
-    problem_filter: str = None,
-    agent_to_run: str = None,
+    problem_filter: str | None = None,
+    agent_to_run: str | None = None,
     use_external_harness: bool = False,
-    n_attempts: int = 1,
+    n_attempts: int = 1
 ):
     """
     Deploy each problem and wait for HTTP grading via POST /submit.
@@ -110,10 +111,11 @@ def driver_loop(
                     console.log(f"✅ Fault injected for problem '{pid}'. Exiting for external harness.")
                     return []
 
-                if not use_external_harness:
-                    reg = get_agent(agent_to_run, path=Path(os.path.dirname(os.path.abspath(__file__))) / "agents.yaml")
-                    if reg:
-                        await LAUNCHER.ensure_started(reg)
+                assert agent_to_run is not None
+
+                reg = get_agent(agent_to_run, path=Path(os.path.dirname(os.path.abspath(__file__))) / "agents.yaml")
+                if reg:
+                    await LAUNCHER.ensure_started(reg)
 
                 # Poll until grading completes or agent exits
                 while conductor.submission_stage != "done":
@@ -206,7 +208,7 @@ def start_mcp_server_after_api():
         log_level="info",
     )
     # IMPORTANT: we're not in the main thread
-    config.install_signal_handlers = False
+    config.install_signal_handlers = False  # type: ignore[attr-defined]
 
     server = uvicorn.Server(config)
     # This call blocks *this* thread; it's fine because we're daemonizing the thread
@@ -215,10 +217,10 @@ def start_mcp_server_after_api():
 
 def _run_driver_and_shutdown(
     conductor: Conductor,
-    problem_filter: str = None,
-    agent_to_run: str = None,
+    problem_filter: str | None = None,
+    agent_to_run: str | None = None,
     use_external_harness: bool = False,
-    n_attempts: int = 1,
+    n_attempts: int = 1
 ):
     """Run the benchmark driver, stash results, then tell the API to exit."""
     results = driver_loop(
@@ -228,7 +230,8 @@ def _run_driver_and_shutdown(
         use_external_harness=use_external_harness,
         n_attempts=n_attempts,
     )
-    main.results = results
+    global _driver_results
+    _driver_results = results
     # ⬇️ Ask the API server (running in main thread) to stop so we can write CSV
     request_shutdown()
 
@@ -258,7 +261,8 @@ def main(args):
 
     os.environ["MODEL_ID"] = args.model
 
-    conductor = Conductor()
+    config = ConductorConfig(deploy_loki=not args.use_external_harness)
+    conductor = Conductor(config=config)
 
     # Start the driver in the background; it will call request_shutdown() when finished
     driver_thread = threading.Thread(
@@ -297,7 +301,7 @@ def main(args):
         driver_thread.join(timeout=5)
 
     # When API shuts down, collect results from driver
-    results = getattr(main, "results", [])
+    results = _driver_results
 
     if results:
         aggregated = {}
