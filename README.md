@@ -2,6 +2,9 @@
 
 <h1>SREGym: A Benchmarking Platform for SRE Agents</h1>
 
+<p><strong>The preprint for SREGym!</strong> <a href="https://arxiv.org/abs/2605.07161">https://arxiv.org/abs/2605.07161</a></p>
+<p><strong>The leaderboard is now up on the website:</strong> <a href="https://sregym.com">sregym.com</a></p>
+
 [🔍Overview](#🤖overview) |
 [📦Installation](#📦installation) |
 [🚀Quick Start](#🚀quickstart) |
