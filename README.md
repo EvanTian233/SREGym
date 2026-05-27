@@ -182,5 +182,7 @@ If our work is useful for you, please cite it:
 ## Acknowledgements
 This project is generously supported by a Slingshot grant from the [Laude Institute](https://www.laude.org).
 
+https://github.com/user-attachments/assets/e7b2ee27-e7a9-436a-858d-ee58e8bbd61d
+
 ## License
 Licensed under the [MIT](LICENSE.txt) license.
