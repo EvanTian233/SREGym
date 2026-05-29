@@ -27,8 +27,8 @@ class ProductCatalogServiceFailure(Problem):
                 "Users see missing product data, empty results, or repeated errors when loading product pages. "
                 f"Mechanism: the `flagd-config` ConfigMap in the `{self.namespace}` namespace has the "
                 f'`{self.feature_flag}` feature flag\'s `defaultVariant` set to `"on"`, which activates the '
-                "OpenTelemetry demo's in-app fault path that makes the product-catalog service's `GetProduct` / "
-                "`ListProducts` gRPC handlers raise internal errors."
+                "OpenTelemetry demo's in-app fault path that makes the product-catalog service's `GetProduct` gRPC "
+                "handler return an error for a specific product."
             ),
         )
         # === Attach evaluation oracles ===

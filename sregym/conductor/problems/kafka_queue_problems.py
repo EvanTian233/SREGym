@@ -28,8 +28,8 @@ class KafkaQueueProblems(Problem):
                 "failures tied to event processing. "
                 f"Mechanism: the `flagd-config` ConfigMap in the `{self.namespace}` namespace has the "
                 f'`{self.feature_flag}` feature flag\'s `defaultVariant` set to `"on"`, which activates the '
-                "OpenTelemetry demo's in-app fault path that introduces producer/consumer instability on the "
-                "`orders` Kafka topic (delayed produce calls and consumer rebalance churn)."
+                "OpenTelemetry demo's in-app fault path that overloads the Kafka queue while introducing a "
+                "consumer-side processing delay, producing a consumer lag spike."
             ),
         )
         # === Attach evaluation oracles ===

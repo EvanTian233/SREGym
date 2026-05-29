@@ -29,7 +29,7 @@ class AdServiceFailure(Problem):
                 f"Mechanism: the `flagd-config` ConfigMap in the `{self.namespace}` namespace has the "
                 f'`{self.feature_flag}` feature flag\'s `defaultVariant` set to `"on"`, which activates the '
                 "OpenTelemetry demo's in-app fault path that makes the ad service's `GetAds` gRPC handler "
-                "raise internal errors on every request."
+                "return intermittent errors on a fraction of requests."
             ),
         )
         # === Attach evaluation oracles ===

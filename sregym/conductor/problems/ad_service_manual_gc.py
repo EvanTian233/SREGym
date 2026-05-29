@@ -29,8 +29,8 @@ class AdServiceManualGc(Problem):
                 "ad responses and occasional transient failures while traffic is otherwise normal. "
                 f"Mechanism: the `flagd-config` ConfigMap in the `{self.namespace}` namespace has the "
                 f'`{self.feature_flag}` feature flag\'s `defaultVariant` set to `"on"`, which activates the '
-                "OpenTelemetry demo's in-app fault path that forces the ad service JVM to invoke `System.gc()` "
-                "in a tight loop, producing the observed throughput and latency degradation."
+                "OpenTelemetry demo's in-app fault path that periodically forces the ad service JVM to perform "
+                "full manual garbage collections, producing the observed throughput and latency degradation."
             ),
         )
         # === Attach evaluation oracles ===

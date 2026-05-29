@@ -28,8 +28,8 @@ class CartServiceFailure(Problem):
                 "failed cart updates, and checkout blocking. "
                 f"Mechanism: the `flagd-config` ConfigMap in the `{self.namespace}` namespace has the "
                 f'`{self.feature_flag}` feature flag\'s `defaultVariant` set to `"on"`, which activates the '
-                "OpenTelemetry demo's in-app fault path that makes the cart service's `AddItem` / `GetCart` gRPC "
-                "handlers raise internal errors."
+                "OpenTelemetry demo's in-app fault path that makes the cart service return an error whenever its "
+                "`EmptyCart` gRPC handler is called."
             ),
         )
         # === Attach evaluation oracles ===
